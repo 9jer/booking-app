@@ -15,7 +15,7 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
     List<Booking> findByPropertyId(Long propertyId);
 
     @Query("SELECT COUNT(b) FROM Booking b WHERE b.propertyId = :propertyId " +
-            "AND (b.checkOutDate >= :checkIn AND b.checkInDate <= :checkOut)")
+            "AND (b.checkOutDate >= :checkIn AND b.checkInDate <= :checkOut) AND b.status != 'CANCELLED'")
     Long countOverlappingBookings(Long propertyId, LocalDate checkIn, LocalDate checkOut);
 
     @Query("SELECT b FROM Booking b WHERE b.propertyId = :propertyId ORDER BY b.checkInDate ASC")
