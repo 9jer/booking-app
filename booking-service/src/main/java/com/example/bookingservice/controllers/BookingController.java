@@ -15,6 +15,7 @@ import jakarta.validation.Valid;
 import org.modelmapper.ModelMapper;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.annotation.*;
@@ -79,6 +80,15 @@ public class BookingController {
                                @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate checkOut){
         String jwtToken = authorizationHeader.replace("Bearer ", "");
         return bookingService.isAvailable(propertyId, checkIn, checkOut, jwtToken);
+    }
+
+    // whetherThereWasABooking endpoint
+    @GetMapping("/was-booked")
+    public ResponseEntity<Boolean> wasBooked(@RequestParam("propertyId") Long propertyId, @RequestParam("userId") Long userId){
+        Boolean result = bookingService.whetherThereWasABooking(propertyId, userId);
+        return ResponseEntity.ok()
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(result);
     }
 
 

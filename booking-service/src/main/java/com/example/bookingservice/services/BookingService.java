@@ -96,6 +96,9 @@ public class BookingService {
         return bookingRepository.countOverlappingBookings(propertyId, checkIn, checkOut) == 0;
     }
 
+    public Boolean whetherThereWasABooking(Long propertyId, Long userId){
+        return !(bookingRepository.findBookingByPropertyIdAndUserId(propertyId, userId).isEmpty());
+    }
 
     public List<LocalDate> getAvailableDates(Long propertyId) {
         List<Booking> bookings = bookingRepository.findBookingsByPropertyOrdered(propertyId);
