@@ -18,13 +18,13 @@ import org.springframework.web.bind.annotation.*;
 import java.util.stream.Collectors;
 
 @RestController
-@RequestMapping("/api/v1/reviews")
+@RequestMapping("${application.endpoint.root}")
 @RequiredArgsConstructor
 public class ReviewController {
     private final ReviewService reviewService;
     private final ModelMapper modelMapper;
 
-    @GetMapping("/property/{id}")
+    @GetMapping(path = "${application.endpoint.reviews-by-property-id}")
     public ResponseEntity<ReviewsResponse> getReviewsByPropertyId(@PathVariable Long id) {
         return ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_JSON)

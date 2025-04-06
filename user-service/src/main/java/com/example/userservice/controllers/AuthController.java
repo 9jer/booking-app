@@ -17,11 +17,11 @@ import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequiredArgsConstructor
-@RequestMapping("/api/v1/auth")
+@RequestMapping("${application.endpoint.auth.root}")
 public class AuthController {
     private final AuthService authService;
 
-    @PostMapping("/sign-in")
+    @PostMapping(path = "${application.endpoint.auth.sign-in}")
     public ResponseEntity<?> createAuthToken(@RequestBody @Valid JwtRequest authRequest, BindingResult bindingResult) {
 
         if (bindingResult.hasErrors()) {
@@ -33,7 +33,7 @@ public class AuthController {
                 .body(authService.createAuthToken(authRequest));
     }
 
-    @PostMapping("/sign-up")
+    @PostMapping(path = "${application.endpoint.auth.sign-up}")
     public ResponseEntity<?> createNewUser(@RequestBody @Valid SaveUserDTO saveUserDTO, BindingResult bindingResult) {
 
         if (bindingResult.hasErrors()) {

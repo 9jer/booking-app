@@ -14,6 +14,7 @@ import com.example.bookingservice.util.ErrorsUtil;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.modelmapper.ModelMapper;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -26,11 +27,13 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 @RestController
-@RequestMapping("/api/v1/bookings")
+@RequestMapping("${application.endpoint.root}")
 @RequiredArgsConstructor
 public class BookingController {
     private final BookingService bookingService;
     private final ModelMapper modelMapper;
+    @Value("${application.endpoint.root}")
+    private String rootEndpointUri;
 
     @GetMapping
     public ResponseEntity<BookingsResponse> getAllBookings(){
@@ -40,14 +43,14 @@ public class BookingController {
                         .map(this::convertBookingToBookingDTO).collect(Collectors.toList())));
     }
 
-    @GetMapping("/{id}")
+    @GetMapping(path = "${application.endpoint.id}")
     public ResponseEntity<BookingDTO> getBookingById(@PathVariable("id") Long id){
         return ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(convertBookingToBookingDTO(bookingService.getBookingById(id)));
     }
 
-    @GetMapping("/history/{id}")
+    @GetMapping(path = "${application.endpoint.booking-history-by-id}")
     public ResponseEntity<BookingHistoryResponse> getBookingHistoryById(@PathVariable("id") Long id){
         return ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_JSON)
@@ -67,13 +70,13 @@ public class BookingController {
         String jwtToken = authorizationHeader.replace("Bearer ", "");
         Booking createdBooking = bookingService.createBooking(booking, jwtToken);
 
-        URI location = URI.create("/api/v1/bookings/" + createdBooking.getId());
+        URI location = URI.create(rootEndpointUri + "/" + createdBooking.getId());
         return ResponseEntity.created(location)
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(createdBooking);
     }
 
-    @PatchMapping("/{id}/status")
+    @PatchMapping(path = "${application.endpoint.booking-status}")
     public ResponseEntity<Booking> updateBookingStatus(@PathVariable Long id, @RequestParam BookingStatus status){
         Booking updatedBooking = bookingService.updateBookingStatus(id, status);
 
@@ -82,7 +85,7 @@ public class BookingController {
                 .body(updatedBooking);
     }
 
-    @GetMapping("/availability")
+    @GetMapping(path = "${application.endpoint.availability}")
     public ResponseEntity<Boolean> isAvailable(@RequestHeader("Authorization") String authorizationHeader,
                                @RequestParam("propertyId") Long propertyId, @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate checkIn,
                                @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate checkOut){
@@ -91,13 +94,13 @@ public class BookingController {
     }
 
     // whetherThereWasABooking endpoint
-    @GetMapping("/was-booked")
+    @GetMapping(path = "${application.endpoint.was-booked}")
     public ResponseEntity<Boolean> wasBooked(@RequestParam("propertyId") Long propertyId, @RequestParam("userId") Long userId){
         Boolean result = bookingService.whetherThereWasABooking(propertyId, userId);
         return ResponseEntity.ok(result);
     }
 
-    @GetMapping("/available-dates")
+    @GetMapping(path = "${application.endpoint.available-dates}")
     public ResponseEntity<List<LocalDate>> getAvailableDates(@RequestParam Long propertyId) {
         return ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_JSON)

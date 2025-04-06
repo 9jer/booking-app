@@ -20,7 +20,7 @@ import org.springframework.web.bind.annotation.*;
 import java.security.Principal;
 
 @RestController
-@RequestMapping("/api/v1/users")
+@RequestMapping("${application.endpoint.users.root}")
 @RequiredArgsConstructor
 public class UserController {
     private final UserService userService;
@@ -33,7 +33,7 @@ public class UserController {
                 .body(new UsersResponse(userService.findAll().stream().map(this::convertUserToUserDTO).toList()));
     }
 
-    @PatchMapping("/{id}")
+    @PatchMapping(path = "${application.endpoint.users.id}")
     public ResponseEntity<User> updateUser(@PathVariable("id") Long id, @RequestBody @Valid SaveUserDTO saveUserDTO, BindingResult bindingResult) {
 
         if(bindingResult.hasErrors()) {
@@ -47,21 +47,21 @@ public class UserController {
                 .body(updatedUser);
     }
 
-    @DeleteMapping("/{id}")
+    @DeleteMapping(path = "${application.endpoint.users.id}")
     public ResponseEntity<HttpStatus> deleteUser(@PathVariable("id") Long id) {
         userService.deleteUserById(id);
 
         return ResponseEntity.ok(HttpStatus.OK);
     }
 
-    @GetMapping("/{id}")
+    @GetMapping("${application.endpoint.users.id}")
     public ResponseEntity<UserDTO> getUserById(@PathVariable("id") Long id) {
         return ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(convertUserToUserDTO(userService.getUserById(id)));
     }
 
-    @PostMapping("/{id}/assign-owner")
+    @PostMapping(path = "${application.endpoint.users.assign-owner}")
     public ResponseEntity<UserDTO> assignOwnerRole(@PathVariable("id") Long id) {
         User updatedUser = userService.assignOwnerRole(id);
         return ResponseEntity.ok()
@@ -69,12 +69,12 @@ public class UserController {
                 .body(convertUserToUserDTO(updatedUser));
     }
 
-    @GetMapping("/{id}/exists")
+    @GetMapping(path = "${application.endpoint.users.exists}")
     public ResponseEntity<Boolean> userExists(@PathVariable Long id) {
         return ResponseEntity.ok(userService.existsById(id));
     }
 
-    @GetMapping("/info")
+    @GetMapping(path = "${application.endpoint.users.info}")
     public String userData(Principal principal){
         return principal.getName();
     }

@@ -23,7 +23,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 @RestController
-@RequestMapping("/api/v1/properties")
+@RequestMapping("${application.endpoint.root}")
 @RequiredArgsConstructor
 public class PropertyController {
 
@@ -48,7 +48,7 @@ public class PropertyController {
                 .body(savedProperty);
     }
 
-    @PatchMapping("/{id}")
+    @PatchMapping(path = "${application.endpoint.id}")
     public ResponseEntity<Property> updateProperty(@RequestHeader("Authorization") String authorizationHeader,
                                                      @PathVariable("id") Long id, @RequestBody @Valid PropertyDTO propertyDTO, BindingResult bindingResult) {
         Property property = convertPropertyDTOToProperty(propertyDTO);
@@ -65,7 +65,7 @@ public class PropertyController {
                 .body(updatedProperty);
     }
 
-    @DeleteMapping("/{id}")
+    @DeleteMapping(path = "${application.endpoint.id}")
     public ResponseEntity<HttpStatus> deleteProperty(@PathVariable("id") Long id) {
         propertyService.delete(id);
 
@@ -80,14 +80,14 @@ public class PropertyController {
                 .map(this::convertPropertyToPropertyDTO).collect(Collectors.toList())));
     }
 
-    @GetMapping("/{id}")
+    @GetMapping(path = "${application.endpoint.id}")
     public ResponseEntity<PropertyDTO> getPropertyById(@PathVariable("id") Long id) {
         return ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(convertPropertyToPropertyDTO(propertyService.getPropertyById(id)));
     }
 
-    @GetMapping("/search")
+    @GetMapping(path = "${application.endpoint.search}")
     public ResponseEntity<List<Property>> searchProperties(
             @RequestParam(required = false) String location,
             @RequestParam(required = false) BigDecimal minPrice,
@@ -98,25 +98,25 @@ public class PropertyController {
     }
 
 
-    @GetMapping("/{id}/availability")
+    @GetMapping(path = "${application.endpoint.availability}")
     public ResponseEntity<Boolean> checkAvailability(@RequestHeader("Authorization") String authorizationHeader,
-                                     @PathVariable Long id,
+                                     @PathVariable("id") Long id,
                                      @RequestParam LocalDate checkIn,
                                      @RequestParam LocalDate checkOut) {
         String jwtToken = authorizationHeader.replace("Bearer ", "");
         return ResponseEntity.ok(propertyService.isPropertyAvailable(id, checkIn, checkOut, jwtToken));
     }
 
-    @GetMapping("/{id}/available-dates")
-    public ResponseEntity<AvailableDatesResponse> getAvailableDates(@RequestHeader("Authorization") String authorizationHeader, @PathVariable Long id) {
+    @GetMapping(path = "${application.endpoint.available-dates}")
+    public ResponseEntity<AvailableDatesResponse> getAvailableDates(@RequestHeader("Authorization") String authorizationHeader, @PathVariable("id") Long id) {
         String jwtToken = authorizationHeader.replace("Bearer ", "");
         return ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(new AvailableDatesResponse(propertyService.getAvailableDates(id, jwtToken)));
     }
 
-    @GetMapping("/{id}/exists")
-    public ResponseEntity<Boolean> propertyExists(@PathVariable Long id) {
+    @GetMapping(path = "${application.endpoint.exists}")
+    public ResponseEntity<Boolean> propertyExists(@PathVariable("id") Long id) {
         Boolean exists = propertyService.existsById(id);
         return ResponseEntity.ok(exists);
     }
