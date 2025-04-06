@@ -8,8 +8,10 @@ import com.example.reviewservice.util.ErrorsUtil;
 import com.example.reviewservice.util.ReviewErrorResponse;
 import com.example.reviewservice.util.ReviewException;
 import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
 import org.modelmapper.ModelMapper;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.annotation.*;
@@ -18,20 +20,17 @@ import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/v1/reviews")
+@RequiredArgsConstructor
 public class ReviewController {
     private final ReviewService reviewService;
     private final ModelMapper modelMapper;
 
-    public ReviewController(ReviewService reviewService, ModelMapper modelMapper) {
-        this.reviewService = reviewService;
-        this.modelMapper = modelMapper;
-    }
-
     @GetMapping("/property/{id}")
-    @ResponseStatus(HttpStatus.OK)
-    public ReviewsResponse getReviewsByPropertyId(@PathVariable Long id) {
-        return new ReviewsResponse(reviewService.getReviewsByPropertyId(id).stream()
-                .map(this::convertReviewToReviewDTO).collect(Collectors.toList()));
+    public ResponseEntity<ReviewsResponse> getReviewsByPropertyId(@PathVariable Long id) {
+        return ResponseEntity.ok()
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(new ReviewsResponse(reviewService.getReviewsByPropertyId(id).stream()
+                        .map(this::convertReviewToReviewDTO).collect(Collectors.toList())));
     }
 
     @PostMapping
@@ -44,7 +43,9 @@ public class ReviewController {
         }
 
         String jwtToken = authorizationHeader.replace("Bearer ", "");
-        return ResponseEntity.ok(reviewService.saveReview(review, jwtToken));
+        return ResponseEntity.ok()
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(reviewService.saveReview(review, jwtToken));
     }
 
     private Review convertReviewDTOToReview(ReviewDTO reviewDTO) {
@@ -68,6 +69,8 @@ public class ReviewController {
                 System.currentTimeMillis()
         );
 
-        return new ResponseEntity<>(reviewErrorResponse, HttpStatus.BAD_REQUEST);
+        return ResponseEntity.badRequest()
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(reviewErrorResponse);
     }
 }

@@ -12,6 +12,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.modelmapper.ModelMapper;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.annotation.*;
@@ -26,21 +27,24 @@ public class UserController {
     private final ModelMapper modelMapper;
 
     @GetMapping
-    @ResponseStatus(HttpStatus.OK)
-    public UsersResponse getAllUsers() {
-        return new UsersResponse(userService.findAll().stream().map(this::convertUserToUserDTO).toList());
+    public ResponseEntity<UsersResponse> getAllUsers() {
+        return ResponseEntity.ok()
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(new UsersResponse(userService.findAll().stream().map(this::convertUserToUserDTO).toList()));
     }
 
     @PatchMapping("/{id}")
-    public ResponseEntity<HttpStatus> updateUser(@PathVariable("id") Long id, @RequestBody @Valid SaveUserDTO saveUserDTO, BindingResult bindingResult) {
+    public ResponseEntity<User> updateUser(@PathVariable("id") Long id, @RequestBody @Valid SaveUserDTO saveUserDTO, BindingResult bindingResult) {
 
         if(bindingResult.hasErrors()) {
             ErrorsUtil.returnAllErrors(bindingResult);
         }
 
-        userService.updateUserById(id, saveUserDTO);
+        User updatedUser = userService.updateUserById(id, saveUserDTO);
 
-        return ResponseEntity.ok(HttpStatus.OK);
+        return ResponseEntity.ok()
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(updatedUser);
     }
 
     @DeleteMapping("/{id}")
@@ -51,19 +55,23 @@ public class UserController {
     }
 
     @GetMapping("/{id}")
-    public UserDTO getUserById(@PathVariable("id") Long id) {
-        return convertUserToUserDTO(userService.getUserById(id));
+    public ResponseEntity<UserDTO> getUserById(@PathVariable("id") Long id) {
+        return ResponseEntity.ok()
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(convertUserToUserDTO(userService.getUserById(id)));
     }
 
     @PostMapping("/{id}/assign-owner")
     public ResponseEntity<UserDTO> assignOwnerRole(@PathVariable("id") Long id) {
         User updatedUser = userService.assignOwnerRole(id);
-        return ResponseEntity.ok(convertUserToUserDTO(updatedUser));
+        return ResponseEntity.ok()
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(convertUserToUserDTO(updatedUser));
     }
 
     @GetMapping("/{id}/exists")
-    public Boolean userExists(@PathVariable Long id) {
-        return userService.existsById(id);
+    public ResponseEntity<Boolean> userExists(@PathVariable Long id) {
+        return ResponseEntity.ok(userService.existsById(id));
     }
 
     @GetMapping("/info")
@@ -81,7 +89,9 @@ public class UserController {
 
     @ExceptionHandler
     private ResponseEntity<ErrorResponse> handleException(UserException e) {
-        return new ResponseEntity<>(new ErrorResponse(HttpStatus.BAD_REQUEST.value(),
-                e.getMessage()), HttpStatus.BAD_REQUEST);
+        return ResponseEntity.badRequest()
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(new ErrorResponse(HttpStatus.BAD_REQUEST.value(),
+                        e.getMessage()));
     }
 }

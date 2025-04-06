@@ -10,6 +10,7 @@ import com.example.userservice.util.UserException;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.annotation.*;
@@ -27,7 +28,9 @@ public class AuthController {
             ErrorsUtil.returnAllErrors(bindingResult);
         }
 
-        return ResponseEntity.ok(authService.createAuthToken(authRequest));
+        return ResponseEntity.ok()
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(authService.createAuthToken(authRequest));
     }
 
     @PostMapping("/sign-up")
@@ -37,19 +40,25 @@ public class AuthController {
             ErrorsUtil.returnAllErrors(bindingResult);
         }
 
-        return ResponseEntity.ok(authService.createNewUser(saveUserDTO));
+        return ResponseEntity.ok()
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(authService.createNewUser(saveUserDTO));
     }
 
     @ExceptionHandler
     private ResponseEntity<ErrorResponse> handleException(UserException e) {
-        return new ResponseEntity<>(new ErrorResponse(HttpStatus.BAD_REQUEST.value(),
-                e.getMessage()), HttpStatus.BAD_REQUEST);
+        return ResponseEntity.badRequest()
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(new ErrorResponse(HttpStatus.BAD_REQUEST.value(),
+                        e.getMessage()));
     }
 
     @ExceptionHandler
     private ResponseEntity<ErrorResponse> handleException(AuthException e) {
-        return new ResponseEntity<>(new ErrorResponse(HttpStatus.UNAUTHORIZED.value(),
-                e.getMessage()), HttpStatus.UNAUTHORIZED);
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(new ErrorResponse(HttpStatus.UNAUTHORIZED.value(),
+                        e.getMessage()));
     }
 
 }
