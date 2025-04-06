@@ -49,21 +49,21 @@ public class BookingServiceImpl implements BookingService {
 
     @Override
     @Transactional
-    public Booking createBooking(Booking booking, String jwtToken) {
+    public Booking createBooking(Booking booking) {
 
-        Boolean propertyExists = propertyClient.checkPropertyExists(booking.getPropertyId(), jwtToken).block();
+        Boolean propertyExists = propertyClient.propertyExists(booking.getPropertyId());
         if (propertyExists == null || !propertyExists) {
             throw new BookingException("Property with id " + booking.getPropertyId() + " not found.");
         }
 
-        Boolean userExists = userClient.checkUserExists(booking.getUserId(), jwtToken).block();
+        Boolean userExists = userClient.userExists(booking.getUserId());
 
         if (userExists == null || !userExists) {
             throw new BookingException("User with id " + booking.getUserId()
                     + " not found.");
         }
 
-        if(!isAvailable(booking.getPropertyId(), booking.getCheckInDate(), booking.getCheckOutDate(), jwtToken)){
+        if(!isAvailable(booking.getPropertyId(), booking.getCheckInDate(), booking.getCheckOutDate())){
             throw new BookingException("Property is not available");
         }
 
@@ -85,12 +85,12 @@ public class BookingServiceImpl implements BookingService {
     }
 
     @Override
-    public Boolean isAvailable(Long propertyId, LocalDate checkIn, LocalDate checkOut, String jwtToken) {
+    public Boolean isAvailable(Long propertyId, LocalDate checkIn, LocalDate checkOut) {
         if (checkIn.isAfter(checkOut) || checkIn.isEqual(checkOut)) {
             throw new BookingException("Check-in date must be before check-out date.");
         }
 
-        Boolean propertyExists = propertyClient.checkPropertyExists(propertyId, jwtToken).block();
+        Boolean propertyExists = propertyClient.propertyExists(propertyId);
         if (propertyExists == null || !propertyExists) {
             throw new BookingException("Property with id " + propertyId + " not found.");
         }
@@ -144,7 +144,7 @@ public class BookingServiceImpl implements BookingService {
 
         return availableDates;
     }
-    
+
     private void saveHistory(Booking booking, BookingStatus bookingStatus) {
         BookingHistory bookingHistory = new BookingHistory();
         bookingHistory.setBooking(booking);

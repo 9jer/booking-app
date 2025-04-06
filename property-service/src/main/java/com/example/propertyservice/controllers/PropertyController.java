@@ -31,8 +31,7 @@ public class PropertyController {
     private final ModelMapper modelMapper;
 
     @PostMapping
-    public ResponseEntity<Property> createProperty(@RequestHeader("Authorization") String authorizationHeader,
-                                                     @RequestBody @Valid PropertyDTO propertyDTO,
+    public ResponseEntity<Property> createProperty(@RequestBody @Valid PropertyDTO propertyDTO,
                                                      BindingResult bindingResult) {
         Property property = convertPropertyDTOToProperty(propertyDTO);
 
@@ -40,8 +39,7 @@ public class PropertyController {
             ErrorsUtil.returnAllErrors(bindingResult);
         }
 
-        String jwtToken = authorizationHeader.replace("Bearer ", "");
-        Property savedProperty = propertyService.save(property, jwtToken);
+        Property savedProperty = propertyService.save(property);
 
         return ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_JSON)
@@ -49,16 +47,14 @@ public class PropertyController {
     }
 
     @PatchMapping(path = "${application.endpoint.id}")
-    public ResponseEntity<Property> updateProperty(@RequestHeader("Authorization") String authorizationHeader,
-                                                     @PathVariable("id") Long id, @RequestBody @Valid PropertyDTO propertyDTO, BindingResult bindingResult) {
+    public ResponseEntity<Property> updateProperty(@PathVariable("id") Long id, @RequestBody @Valid PropertyDTO propertyDTO, BindingResult bindingResult) {
         Property property = convertPropertyDTOToProperty(propertyDTO);
 
         if(bindingResult.hasErrors()) {
             ErrorsUtil.returnAllErrors(bindingResult);
         }
 
-        String jwtToken = authorizationHeader.replace("Bearer ", "");
-        Property updatedProperty = propertyService.updatePropertyById(id, property, jwtToken);
+        Property updatedProperty = propertyService.updatePropertyById(id, property);
 
         return ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_JSON)
@@ -99,20 +95,17 @@ public class PropertyController {
 
 
     @GetMapping(path = "${application.endpoint.availability}")
-    public ResponseEntity<Boolean> checkAvailability(@RequestHeader("Authorization") String authorizationHeader,
-                                     @PathVariable("id") Long id,
+    public ResponseEntity<Boolean> checkAvailability(@PathVariable("id") Long id,
                                      @RequestParam LocalDate checkIn,
                                      @RequestParam LocalDate checkOut) {
-        String jwtToken = authorizationHeader.replace("Bearer ", "");
-        return ResponseEntity.ok(propertyService.isPropertyAvailable(id, checkIn, checkOut, jwtToken));
+        return ResponseEntity.ok(propertyService.isPropertyAvailable(id, checkIn, checkOut));
     }
 
     @GetMapping(path = "${application.endpoint.available-dates}")
-    public ResponseEntity<AvailableDatesResponse> getAvailableDates(@RequestHeader("Authorization") String authorizationHeader, @PathVariable("id") Long id) {
-        String jwtToken = authorizationHeader.replace("Bearer ", "");
+    public ResponseEntity<AvailableDatesResponse> getAvailableDates(@PathVariable("id") Long id) {
         return ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_JSON)
-                .body(new AvailableDatesResponse(propertyService.getAvailableDates(id, jwtToken)));
+                .body(new AvailableDatesResponse(propertyService.getAvailableDates(id)));
     }
 
     @GetMapping(path = "${application.endpoint.exists}")

@@ -70,7 +70,7 @@ public class UserController {
     }
 
     @GetMapping(path = "${application.endpoint.users.exists}")
-    public ResponseEntity<Boolean> userExists(@PathVariable Long id) {
+    public ResponseEntity<Boolean> userExists(@PathVariable("id") Long id) {
         return ResponseEntity.ok(userService.existsById(id));
     }
 

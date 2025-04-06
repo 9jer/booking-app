@@ -40,8 +40,8 @@ public class PropertyServiceImpl implements PropertyService {
 
     @Override
     @Transactional
-    public Property save(Property property, String jwtToken) {
-        Boolean userExists = userClient.checkUserExists(property.getOwnerId(), jwtToken).block();
+    public Property save(Property property) {
+        Boolean userExists = userClient.userExists(property.getOwnerId());
 
         if (userExists == null || !userExists) {
             throw new PropertyException("User with id " + property.getOwnerId()
@@ -60,10 +60,10 @@ public class PropertyServiceImpl implements PropertyService {
 
     @Override
     @Transactional
-    public Property updatePropertyById(Long id, Property updatedProperty, String jwtToken) {
+    public Property updatePropertyById(Long id, Property updatedProperty) {
         Property existingProperty = getPropertyById(id);
 
-        Boolean userExists = userClient.checkUserExists(updatedProperty.getOwnerId(), jwtToken).block();
+        Boolean userExists = userClient.userExists(updatedProperty.getOwnerId());
 
         if (userExists == null || !userExists) {
             throw new PropertyException("User with id " + updatedProperty.getOwnerId()
@@ -93,13 +93,13 @@ public class PropertyServiceImpl implements PropertyService {
     }
 
     @Override
-    public Boolean isPropertyAvailable(Long propertyId, LocalDate checkIn, LocalDate checkOut, String jwtToken) {
-        return bookingClient.isPropertyAvailable(propertyId, checkIn, checkOut, jwtToken);
+    public Boolean isPropertyAvailable(Long propertyId, LocalDate checkIn, LocalDate checkOut) {
+        return bookingClient.isAvailable(propertyId, checkIn, checkOut);
     }
 
     @Override
-    public List<LocalDate> getAvailableDates(Long propertyId, String jwtToken) {
-        return bookingClient.getAvailableDates(propertyId, jwtToken);
+    public List<LocalDate> getAvailableDates(Long propertyId) {
+        return bookingClient.getAvailableDates(propertyId);
     }
 
     @Override

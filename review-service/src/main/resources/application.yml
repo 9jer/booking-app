@@ -37,3 +37,9 @@ application:
   endpoint:
     root: /api/v1/reviews
     reviews-by-property-id: /property/{id}
+
+feign-client:
+  endpoint:
+    property-exists: /api/v1/properties/{id}/exists
+    user-exists: api/v1/users/{id}/exists
+    was-booked: /api/v1/bookings/was-booked

@@ -33,18 +33,16 @@ public class ReviewController {
     }
 
     @PostMapping
-    public ResponseEntity<Review> createReview(@RequestHeader("Authorization") String authorizationHeader,
-                                               @RequestBody @Valid ReviewDTO reviewDTO, BindingResult bindingResult) {
+    public ResponseEntity<Review> createReview(@RequestBody @Valid ReviewDTO reviewDTO, BindingResult bindingResult) {
         Review review = convertReviewDTOToReview(reviewDTO);
 
         if(bindingResult.hasErrors()) {
             ErrorsUtil.returnAllErrors(bindingResult);
         }
 
-        String jwtToken = authorizationHeader.replace("Bearer ", "");
         return ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_JSON)
-                .body(reviewService.saveReview(review, jwtToken));
+                .body(reviewService.saveReview(review));
     }
 
     private Review convertReviewDTOToReview(ReviewDTO reviewDTO) {

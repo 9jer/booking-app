@@ -1,22 +1,13 @@
 package com.example.bookingservice.client;
 
-import org.springframework.stereotype.Service;
-import org.springframework.web.reactive.function.client.WebClient;
-import reactor.core.publisher.Mono;
+import org.springframework.cloud.openfeign.FeignClient;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 
-@Service
-public class PropertyClient {
-    private final WebClient webClient;
+@FeignClient("property-service")
+public interface PropertyClient {
 
-    public PropertyClient(WebClient.Builder webClientBuilder) {
-        this.webClient = webClientBuilder.baseUrl("http://localhost:8081/api/v1/properties").build();
-    }
-
-    public Mono<Boolean> checkPropertyExists(Long propertyId, String jwtToken) {
-        return webClient.get()
-                .uri("/{id}/exists", propertyId)
-                .headers(headers -> headers.setBearerAuth(jwtToken))
-                .retrieve()
-                .bodyToMono(Boolean.class);
-    }
+    @GetMapping(path = "${feign-client.endpoint.property-exists}")
+    Boolean propertyExists(@PathVariable("id") Long id);
 }

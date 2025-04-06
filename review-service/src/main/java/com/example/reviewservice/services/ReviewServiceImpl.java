@@ -29,13 +29,12 @@ public class ReviewServiceImpl implements ReviewService {
 
     @Override
     @Transactional
-    public Review saveReview(Review review, String jwtToken) {
-        Boolean propertyExists = propertyClient
-                .checkPropertyExists(review.getPropertyId(), jwtToken).block();
+    public Review saveReview(Review review) {
+        Boolean propertyExists = propertyClient.propertyExists(review.getPropertyId());
 
-        Boolean userExists = userClient.checkUserExists(review.getUserId(), jwtToken).block();
+        Boolean userExists = userClient.userExists(review.getUserId());
 
-        Boolean wasBooked = bookingClient.checkIfItWasBooked(review.getPropertyId(), review.getUserId(), jwtToken).block();
+        Boolean wasBooked = bookingClient.wasBooked(review.getPropertyId(), review.getUserId());
 
         if (propertyExists == null || !propertyExists) {
             throw new ReviewException("Property with id " + review.getPropertyId()

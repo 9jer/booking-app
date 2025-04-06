@@ -41,3 +41,9 @@ application:
     availability: /{id}/availability
     available-dates: /{id}/available-dates
     exists: /{id}/exists
+
+feign-client:
+  endpoint:
+    property-availability: /api/v1/bookings/availability
+    available-dates: /api/v1/bookings/available-dates
+    user-exists: /api/v1/users/{id}/exists

@@ -33,6 +33,7 @@
     <spring-boot-devtools.version>3.3.5</spring-boot-devtools.version>
     <modelmapper.version>3.2.1</modelmapper.version>
     <junit.version>4.13.2</junit.version>
+    <feign-httpclient.version>13.5</feign-httpclient.version>
   </properties>
 
   <dependencyManagement>
@@ -71,7 +72,14 @@
         <version>${junit.version}</version>
         <scope>test</scope>
       </dependency>
+
+      <dependency>
+        <groupId>io.github.openfeign</groupId>
+        <artifactId>feign-httpclient</artifactId>
+        <version>${feign-httpclient.version}</version>
+      </dependency>
     </dependencies>
+
   </dependencyManagement>
 
   <build>

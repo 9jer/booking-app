@@ -59,16 +59,14 @@ public class BookingController {
     }
 
     @PostMapping
-    public ResponseEntity<Booking> createBooking(@RequestHeader("Authorization") String authorizationHeader,
-                                                 @RequestBody @Valid BookingDTO bookingDTO, BindingResult bindingResult){
+    public ResponseEntity<Booking> createBooking(@RequestBody @Valid BookingDTO bookingDTO, BindingResult bindingResult){
         Booking booking = convertBookingDTOToBooking(bookingDTO);
 
         if(bindingResult.hasErrors()){
             ErrorsUtil.returnAllErrors(bindingResult);
         }
 
-        String jwtToken = authorizationHeader.replace("Bearer ", "");
-        Booking createdBooking = bookingService.createBooking(booking, jwtToken);
+        Booking createdBooking = bookingService.createBooking(booking);
 
         URI location = URI.create(rootEndpointUri + "/" + createdBooking.getId());
         return ResponseEntity.created(location)
@@ -86,14 +84,11 @@ public class BookingController {
     }
 
     @GetMapping(path = "${application.endpoint.availability}")
-    public ResponseEntity<Boolean> isAvailable(@RequestHeader("Authorization") String authorizationHeader,
-                               @RequestParam("propertyId") Long propertyId, @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate checkIn,
+    public ResponseEntity<Boolean> isAvailable(@RequestParam("propertyId") Long propertyId, @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate checkIn,
                                @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate checkOut){
-        String jwtToken = authorizationHeader.replace("Bearer ", "");
-        return ResponseEntity.ok(bookingService.isAvailable(propertyId, checkIn, checkOut, jwtToken));
+        return ResponseEntity.ok(bookingService.isAvailable(propertyId, checkIn, checkOut));
     }
 
-    // whetherThereWasABooking endpoint
     @GetMapping(path = "${application.endpoint.was-booked}")
     public ResponseEntity<Boolean> wasBooked(@RequestParam("propertyId") Long propertyId, @RequestParam("userId") Long userId){
         Boolean result = bookingService.whetherThereWasABooking(propertyId, userId);

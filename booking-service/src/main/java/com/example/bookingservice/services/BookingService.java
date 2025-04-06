@@ -12,9 +12,9 @@ public interface BookingService {
     Booking getBookingById(Long bookingId);
     List<Booking> getBookingByPropertyId(Long propertyId);
     List<BookingHistory> getBookingHistoryByBookingId(Long bookingId);
-    Booking createBooking(Booking booking, String jwtToken);
+    Booking createBooking(Booking booking);
     Booking updateBookingStatus(Long bookingId, BookingStatus bookingStatus);
-    Boolean isAvailable(Long propertyId, LocalDate checkIn, LocalDate checkOut, String jwtToken);
+    Boolean isAvailable(Long propertyId, LocalDate checkIn, LocalDate checkOut);
     Boolean whetherThereWasABooking(Long propertyId, Long userId);
     List<LocalDate> getAvailableDates(Long propertyId);
 }

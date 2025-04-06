@@ -1,22 +1,13 @@
 package com.example.reviewservice.client;
 
-import org.springframework.stereotype.Service;
-import org.springframework.web.reactive.function.client.WebClient;
-import reactor.core.publisher.Mono;
+import org.springframework.cloud.openfeign.FeignClient;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 
-@Service
-public class UserClient {
-    private final WebClient webClient;
+@FeignClient("user-service")
+public interface UserClient {
 
-    public UserClient(WebClient.Builder webClientBuilder) {
-        this.webClient = webClientBuilder.baseUrl("http://localhost:8084/api/v1/users").build();
-    }
-
-    public Mono<Boolean> checkUserExists(Long userId, String jwtToken) {
-        return webClient.get()
-                .uri("/{id}/exists", userId)
-                .headers(headers -> headers.setBearerAuth(jwtToken))
-                .retrieve()
-                .bodyToMono(Boolean.class);
-    }
+    @GetMapping(path = "${feign-client.endpoint.user-exists}")
+    Boolean userExists(@PathVariable("id") Long id);
 }
