@@ -117,7 +117,7 @@ public class PropertyController {
 
     @GetMapping("/{id}/exists")
     public ResponseEntity<Boolean> propertyExists(@PathVariable Long id) {
-        boolean exists = propertyService.existsById(id);
+        Boolean exists = propertyService.existsById(id);
         return ResponseEntity.ok(exists);
     }
 

@@ -1,98 +1,20 @@
 package com.example.userservice.services;
 
 import com.example.userservice.dto.SaveUserDTO;
-import com.example.userservice.models.Role;
 import com.example.userservice.models.User;
-import com.example.userservice.repositories.UserRepository;
-import com.example.userservice.util.ErrorsUtil;
-import com.example.userservice.util.UserException;
-import lombok.RequiredArgsConstructor;
-import org.modelmapper.ModelMapper;
-import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
-@Service
-@RequiredArgsConstructor
-@Transactional(readOnly = true)
-public class UserService {
-    private final UserRepository userRepository;
-    private final RoleService roleService;
-    private final PasswordEncoder passwordEncoder;
-    private final ModelMapper modelMapper;
+public interface UserService {
 
-    public Optional<User> findByUsername(String username) {
-        return userRepository.findByUsername(username);
-    }
-
-    public Optional<User> findByEmail(String email) {
-        return userRepository.findByEmail(email);
-    }
-
-    @Transactional
-    public User createNewUser(User user) {
-        user.setPassword(passwordEncoder.encode(user.getPassword()));
-        user.setRoles(List.of(roleService.getGuestRole()));
-        user.setCreatedAt(LocalDateTime.now());
-        return userRepository.save(user);
-    }
-
-    public List<User> findAll() {
-        return userRepository.findAll();
-    }
-
-    public User getUserById(Long id) {
-        return userRepository.findById(id).orElseThrow(()->
-                new UserException(String.format("User %s not found", id)));
-    }
-
-    @Transactional
-    public User updateUserById(Long id, SaveUserDTO updatedUser) {
-
-        ErrorsUtil.validateInputUserData(updatedUser, userRepository.findByUsername(updatedUser.getUsername())
-                ,userRepository.findByEmail(updatedUser.getEmail())
-        );
-
-        User exsitingUser = getUserById(id);
-
-        User user = convertUserDTOToUser(updatedUser);
-        enrichPropertyForUpdate(exsitingUser, user);
-        
-        return userRepository.save(exsitingUser);
-    }
-
-
-    private User convertUserDTOToUser(SaveUserDTO saveUserDTO){
-        return modelMapper.map(saveUserDTO, User.class);
-    }
-
-    private void enrichPropertyForUpdate(User exsitingUser, User updatedUser) {
-        exsitingUser.setUsername(updatedUser.getUsername());
-        exsitingUser.setPassword(passwordEncoder.encode(updatedUser.getPassword()));
-        exsitingUser.setName(updatedUser.getName());
-        exsitingUser.setEmail(updatedUser.getEmail());
-        exsitingUser.setPhone(updatedUser.getPhone());
-        exsitingUser.setUpdatedAt(LocalDateTime.now());
-    }
-
-    @Transactional
-    public User assignOwnerRole(Long userId) {
-        User user = getUserById(userId);
-        Role ownerRole = roleService.getOwnerRole();
-        user.getRoles().add(ownerRole);
-        return userRepository.save(user);
-    }
-
-    public boolean existsById(Long id) {
-        return userRepository.existsById(id);
-    }
-
-    @Transactional
-    public void deleteUserById(Long id) {
-        userRepository.deleteById(id);
-    }
+    Optional<User> findByUsername(String username);
+    Optional<User> findByEmail(String email);
+    User createNewUser(User user);
+    List<User> findAll();
+    User getUserById(Long id);
+    User updateUserById(Long id, SaveUserDTO updatedUser);
+    User assignOwnerRole(Long userId);
+    Boolean existsById(Long id);
+    void deleteUserById(Long id);
 }
