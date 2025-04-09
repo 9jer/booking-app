@@ -9,12 +9,15 @@ import lombok.Setter;
 
 @Getter
 @Setter
-public class ReviewDTO {
+public class GetReviewDTO {
+
+    private Long id;
+
     @NotNull(message = "Property id should not be empty!")
     private Long propertyId;
 
-/*    @NotNull(message = "User id should not be empty!")
-    private Long userId;*/
+    @NotNull(message = "User id should not be empty!")
+    private Long userId;
 
     @NotNull(message = "Rating should not be empty!")
     @Min(value = 1, message = "Rating should be greater than 1 and less than 5")
@@ -23,4 +26,5 @@ public class ReviewDTO {
 
     @NotEmpty(message = "Comment should not be empty!")
     private String comment;
+
 }

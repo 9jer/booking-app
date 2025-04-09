@@ -2,6 +2,12 @@ target/
 !.mvn/wrapper/maven-wrapper.jar
 !**/src/main/**/target/
 !**/src/test/**/target/
+user-service/src/main/resources/secrets.properties
+review-service/src/main/resources/secrets.properties
+property-service/src/main/resources/secrets.properties
+booking-service/src/main/resources/secrets.properties
+api-gateway/src/main/resources/secrets.properties
+
 
 ### IntelliJ IDEA ###
 .idea/modules.xml

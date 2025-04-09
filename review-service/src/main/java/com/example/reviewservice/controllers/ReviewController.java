@@ -1,5 +1,6 @@
 package com.example.reviewservice.controllers;
 
+import com.example.reviewservice.dto.GetReviewDTO;
 import com.example.reviewservice.dto.ReviewDTO;
 import com.example.reviewservice.dto.ReviewsResponse;
 import com.example.reviewservice.models.Review;
@@ -29,25 +30,28 @@ public class ReviewController {
         return ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(new ReviewsResponse(reviewService.getReviewsByPropertyId(id).stream()
-                        .map(this::convertReviewToReviewDTO).collect(Collectors.toList())));
+                        .map(this::convertReviewToGetReviewDTO).collect(Collectors.toList())));
     }
 
     @PostMapping
-    public ResponseEntity<Review> createReview(@RequestBody @Valid ReviewDTO reviewDTO, BindingResult bindingResult) {
+    public ResponseEntity<Review> createReview(@RequestHeader("Authorization") String authorizationHeader,
+            @RequestBody @Valid ReviewDTO reviewDTO, BindingResult bindingResult) {
         Review review = convertReviewDTOToReview(reviewDTO);
 
         if(bindingResult.hasErrors()) {
             ErrorsUtil.returnAllErrors(bindingResult);
         }
 
+        String jwtToken = authorizationHeader.replace("Bearer ", "");
+
         return ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_JSON)
-                .body(reviewService.saveReview(review));
+                .body(reviewService.saveReview(review, jwtToken));
     }
 
     private Review convertReviewDTOToReview(ReviewDTO reviewDTO) {
         Review review = new Review();
-        review.setUserId(reviewDTO.getUserId());
+        //review.setUserId(reviewDTO.getUserId());
         review.setPropertyId(reviewDTO.getPropertyId());
         review.setRating(reviewDTO.getRating());
         review.setComment(reviewDTO.getComment());
@@ -55,8 +59,8 @@ public class ReviewController {
         return review;
     }
 
-    private ReviewDTO convertReviewToReviewDTO(Review review) {
-        return modelMapper.map(review, ReviewDTO.class);
+    private GetReviewDTO convertReviewToGetReviewDTO(Review review) {
+        return modelMapper.map(review, GetReviewDTO.class);
     }
 
     @ExceptionHandler

@@ -6,6 +6,7 @@ import com.example.propertyservice.models.Property;
 import com.example.propertyservice.models.PropertyFeature;
 import com.example.propertyservice.repositories.PropertyFeatureRepository;
 import com.example.propertyservice.repositories.PropertyRepository;
+import com.example.propertyservice.util.JwtTokenUtils;
 import com.example.propertyservice.util.PropertyException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -26,6 +27,7 @@ public class PropertyServiceImpl implements PropertyService {
     private final PropertyFeatureRepository propertyFeatureRepository;
     private final BookingClient bookingClient;
     private final UserClient userClient;
+    private final JwtTokenUtils jwtTokenUtils;
 
     @Override
     public List<Property> findAll(){
@@ -40,7 +42,9 @@ public class PropertyServiceImpl implements PropertyService {
 
     @Override
     @Transactional
-    public Property save(Property property) {
+    public Property save(Property property, String token) {
+        property.setOwnerId(jwtTokenUtils.getUserId(token));
+
         Boolean userExists = userClient.userExists(property.getOwnerId());
 
         if (userExists == null || !userExists) {
@@ -60,8 +64,10 @@ public class PropertyServiceImpl implements PropertyService {
 
     @Override
     @Transactional
-    public Property updatePropertyById(Long id, Property updatedProperty) {
+    public Property updatePropertyById(Long id, Property updatedProperty, String token) {
         Property existingProperty = getPropertyById(id);
+
+        updatedProperty.setOwnerId(jwtTokenUtils.getUserId(token));
 
         Boolean userExists = userClient.userExists(updatedProperty.getOwnerId());
 

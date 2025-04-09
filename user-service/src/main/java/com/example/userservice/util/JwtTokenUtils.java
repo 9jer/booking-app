@@ -1,5 +1,6 @@
 package com.example.userservice.util;
 
+import com.example.userservice.security.CustomUserDetails;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
@@ -30,13 +31,14 @@ public class JwtTokenUtils {
         List<String> roleList = userDetails.getAuthorities().stream()
                 .map(GrantedAuthority::getAuthority).toList();
         claims.put("roles", roleList);
+        claims.put("id", ((CustomUserDetails) userDetails).getId());
 
         Date issuedDate = new Date();
         Date expiredDate = new Date(issuedDate.getTime() + jwtLifetime.toMillis());
 
         return Jwts.builder()
+                .subject(userDetails.getUsername()) // getUsername() = getId()
                 .claims(claims)
-                .subject(userDetails.getUsername())
                 .issuedAt(issuedDate)
                 .expiration(expiredDate)
                 .signWith(getSignKey(), Jwts.SIG.HS256)
@@ -53,6 +55,10 @@ public class JwtTokenUtils {
 
     public String getUsername(String token) {
         return getClaimsFromToken(token).getSubject();
+    }
+
+    public Long getUserId(String token) {
+        return getClaimsFromToken(token).get("id", Long.class);
     }
 
     public List<String> getRoles(String token) {

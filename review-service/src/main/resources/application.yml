@@ -2,6 +2,9 @@ spring:
   application:
     name: review-service
 
+  config:
+    import: optional:classpath:secrets.properties
+
   datasource:
     driver-class-name: org.postgresql.Driver
     url: jdbc:postgresql://localhost:5432/review_service_db
@@ -28,7 +31,7 @@ eureka:
     prefer-ip-address: true
 
 jwt:
-  secret: 4b6050b9a135b722dab15dabc4f22d246b705030ec5af354221550b89c735ed8
+  secret: ${jwt.secret}
 
 server:
   port: 8083

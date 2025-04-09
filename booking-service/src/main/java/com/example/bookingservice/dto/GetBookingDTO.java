@@ -9,9 +9,12 @@ import java.time.LocalDate;
 
 @Getter
 @Setter
-public class BookingDTO {
-/*    @NotNull(message = "userId should not be empty!")
-    private Long userId;*/
+public class GetBookingDTO {
+
+    private Long id;
+
+    @NotNull(message = "userId should not be empty!")
+    private Long userId;
 
     @NotNull(message = "propertyId should not be empty!")
     private Long propertyId;

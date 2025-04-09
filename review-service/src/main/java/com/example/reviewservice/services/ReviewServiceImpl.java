@@ -5,6 +5,7 @@ import com.example.reviewservice.client.PropertyClient;
 import com.example.reviewservice.client.UserClient;
 import com.example.reviewservice.models.Review;
 import com.example.reviewservice.repositories.ReviewRepository;
+import com.example.reviewservice.util.JwtTokenUtils;
 import com.example.reviewservice.util.ReviewException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -21,6 +22,7 @@ public class ReviewServiceImpl implements ReviewService {
     private final PropertyClient propertyClient;
     private final UserClient userClient;
     private final BookingClient bookingClient;
+    private final JwtTokenUtils jwtTokenUtils;
 
     @Override
     public List<Review> getReviewsByPropertyId(Long propertyId) {
@@ -29,9 +31,10 @@ public class ReviewServiceImpl implements ReviewService {
 
     @Override
     @Transactional
-    public Review saveReview(Review review) {
+    public Review saveReview(Review review, String token) {
         Boolean propertyExists = propertyClient.propertyExists(review.getPropertyId());
 
+        review.setUserId(jwtTokenUtils.getUserId(token));
         Boolean userExists = userClient.userExists(review.getUserId());
 
         Boolean wasBooked = bookingClient.wasBooked(review.getPropertyId(), review.getUserId());

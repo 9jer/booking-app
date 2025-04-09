@@ -4,6 +4,8 @@ import com.example.userservice.dto.JwtRequest;
 import com.example.userservice.dto.JwtResponse;
 import com.example.userservice.dto.SaveUserDTO;
 import com.example.userservice.models.User;
+import com.example.userservice.security.CustomUserDetails;
+import com.example.userservice.security.CustomUserDetailsService;
 import com.example.userservice.util.AuthException;
 import com.example.userservice.util.ErrorsUtil;
 import com.example.userservice.util.JwtTokenUtils;
@@ -12,9 +14,10 @@ import org.modelmapper.ModelMapper;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -35,7 +38,9 @@ public class AuthServiceImpl implements AuthService {
             throw new AuthException("Incorrect login or password!");
         }
 
-        UserDetails userDetails = customUserDetailsService.loadUserByUsername(authRequest.getUsername());
+        CustomUserDetails userDetails = (CustomUserDetails) customUserDetailsService
+                .loadUserByUsername(authRequest.getUsername());
+
         String token = jwtTokenUtils.generateToken(userDetails);
 
         return new JwtResponse(token);

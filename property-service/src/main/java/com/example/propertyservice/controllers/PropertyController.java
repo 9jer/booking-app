@@ -1,6 +1,7 @@
 package com.example.propertyservice.controllers;
 
 import com.example.propertyservice.dto.AvailableDatesResponse;
+import com.example.propertyservice.dto.GetPropertyDTO;
 import com.example.propertyservice.dto.PropertiesResponse;
 import com.example.propertyservice.dto.PropertyDTO;
 import com.example.propertyservice.models.Property;
@@ -31,15 +32,17 @@ public class PropertyController {
     private final ModelMapper modelMapper;
 
     @PostMapping
-    public ResponseEntity<Property> createProperty(@RequestBody @Valid PropertyDTO propertyDTO,
-                                                     BindingResult bindingResult) {
+    public ResponseEntity<Property> createProperty(@RequestHeader("Authorization") String authorizationHeader,
+                                                   @RequestBody @Valid PropertyDTO propertyDTO, BindingResult bindingResult) {
         Property property = convertPropertyDTOToProperty(propertyDTO);
 
         if(bindingResult.hasErrors()) {
             ErrorsUtil.returnAllErrors(bindingResult);
         }
 
-        Property savedProperty = propertyService.save(property);
+        String jwtToken = authorizationHeader.replace("Bearer ", "");
+
+        Property savedProperty = propertyService.save(property, jwtToken);
 
         return ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_JSON)
@@ -47,14 +50,17 @@ public class PropertyController {
     }
 
     @PatchMapping(path = "${application.endpoint.id}")
-    public ResponseEntity<Property> updateProperty(@PathVariable("id") Long id, @RequestBody @Valid PropertyDTO propertyDTO, BindingResult bindingResult) {
+    public ResponseEntity<Property> updateProperty(@RequestHeader("Authorization") String authorizationHeader,
+                                                   @PathVariable("id") Long id, @RequestBody @Valid PropertyDTO propertyDTO, BindingResult bindingResult) {
         Property property = convertPropertyDTOToProperty(propertyDTO);
 
         if(bindingResult.hasErrors()) {
             ErrorsUtil.returnAllErrors(bindingResult);
         }
 
-        Property updatedProperty = propertyService.updatePropertyById(id, property);
+        String jwtToken = authorizationHeader.replace("Bearer ", "");
+
+        Property updatedProperty = propertyService.updatePropertyById(id, property, jwtToken);
 
         return ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_JSON)
@@ -73,14 +79,14 @@ public class PropertyController {
         return ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(new PropertiesResponse(propertyService.findAll().stream()
-                .map(this::convertPropertyToPropertyDTO).collect(Collectors.toList())));
+                .map(this::convertPropertyToGetPropertyDTO).collect(Collectors.toList())));
     }
 
     @GetMapping(path = "${application.endpoint.id}")
-    public ResponseEntity<PropertyDTO> getPropertyById(@PathVariable("id") Long id) {
+    public ResponseEntity<GetPropertyDTO> getPropertyById(@PathVariable("id") Long id) {
         return ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_JSON)
-                .body(convertPropertyToPropertyDTO(propertyService.getPropertyById(id)));
+                .body(convertPropertyToGetPropertyDTO(propertyService.getPropertyById(id)));
     }
 
     @GetMapping(path = "${application.endpoint.search}")
@@ -118,8 +124,8 @@ public class PropertyController {
         return modelMapper.map(propertyDTO, Property.class);
     }
 
-    private PropertyDTO convertPropertyToPropertyDTO(Property property) {
-        return modelMapper.map(property, PropertyDTO.class);
+    private GetPropertyDTO convertPropertyToGetPropertyDTO(Property property) {
+        return modelMapper.map(property, GetPropertyDTO.class);
     }
 
     @ExceptionHandler

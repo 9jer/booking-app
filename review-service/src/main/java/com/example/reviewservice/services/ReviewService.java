@@ -6,5 +6,5 @@ import java.util.List;
 
 public interface ReviewService {
     List<Review> getReviewsByPropertyId(Long propertyId);
-    Review saveReview(Review review);
+    Review saveReview(Review review, String token);
 }

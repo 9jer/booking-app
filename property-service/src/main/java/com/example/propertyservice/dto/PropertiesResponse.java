@@ -10,5 +10,5 @@ import java.util.List;
 @Getter
 @Setter
 public class PropertiesResponse {
-    private List<PropertyDTO> properties;
+    private List<GetPropertyDTO> properties;
 }

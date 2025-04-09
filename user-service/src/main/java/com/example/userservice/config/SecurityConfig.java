@@ -1,6 +1,6 @@
 package com.example.userservice.config;
 
-import com.example.userservice.services.CustomUserDetailsService;
+import com.example.userservice.security.CustomUserDetailsService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -48,12 +48,13 @@ public class SecurityConfig {
                 }))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/v1/auth/**").permitAll()
-                        .requestMatchers("/api/v1/users/{id}/assign-owner").hasRole("OWNER")
+                        .requestMatchers("/api/v1/users/{id}/assign-owner").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.PATCH, "/api/v1/**").authenticated()
                         .requestMatchers(HttpMethod.DELETE, "/api/v1/**").hasRole("OWNER")
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .anyRequest().authenticated()
-                ).httpBasic(Customizer.withDefaults())
+                )
+                //.httpBasic(Customizer.withDefaults())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .exceptionHandling(ex -> ex
                         .authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED))

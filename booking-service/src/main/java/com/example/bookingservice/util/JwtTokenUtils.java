@@ -24,6 +24,16 @@ public class JwtTokenUtils {
                 .getSubject();
     }
 
+    public Long getUserId(String token) {
+        Claims claims = Jwts.parser()
+                .verifyWith(Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8)))
+                .build()
+                .parseSignedClaims(token)
+                .getPayload();
+
+        return claims.get("id", Long.class);
+    }
+
     public List<String> getRoles(String token) {
         Claims claims = Jwts.parser()
                 .verifyWith(Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8)))

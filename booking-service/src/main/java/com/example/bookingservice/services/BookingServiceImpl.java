@@ -8,6 +8,7 @@ import com.example.bookingservice.models.BookingStatus;
 import com.example.bookingservice.repositories.BookingHistoryRepository;
 import com.example.bookingservice.repositories.BookingRepository;
 import com.example.bookingservice.util.BookingException;
+import com.example.bookingservice.util.JwtTokenUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,6 +26,7 @@ public class BookingServiceImpl implements BookingService {
     private final BookingHistoryRepository bookingHistoryRepository;
     private final PropertyClient propertyClient;
     private final UserClient userClient;
+    private final JwtTokenUtils jwtTokenUtils;
 
     @Override
     public List<Booking> getAllBookings() {
@@ -49,12 +51,14 @@ public class BookingServiceImpl implements BookingService {
 
     @Override
     @Transactional
-    public Booking createBooking(Booking booking) {
+    public Booking createBooking(Booking booking, String token) {
 
         Boolean propertyExists = propertyClient.propertyExists(booking.getPropertyId());
         if (propertyExists == null || !propertyExists) {
             throw new BookingException("Property with id " + booking.getPropertyId() + " not found.");
         }
+
+        booking.setUserId(jwtTokenUtils.getUserId(token));
 
         Boolean userExists = userClient.userExists(booking.getUserId());
 
@@ -100,7 +104,7 @@ public class BookingServiceImpl implements BookingService {
 
     @Override
     public Boolean whetherThereWasABooking(Long propertyId, Long userId){
-        return !(bookingRepository.findBookingByPropertyIdAndUserId(propertyId, userId).isEmpty());
+        return !(bookingRepository.findConfirmedBookingByPropertyIdAndUserId(propertyId, userId).isEmpty());
     }
 
     @Override

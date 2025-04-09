@@ -10,11 +10,12 @@ import java.util.Set;
 
 @Getter
 @Setter
-public class PropertyDTO {
-/*
+public class GetPropertyDTO {
+
+    private Long id;
+
     @NotNull(message = "Owner id should not be empty!")
     private Long ownerId;
-*/
 
     @NotEmpty(message = "Title should not be empty!")
     private String title;

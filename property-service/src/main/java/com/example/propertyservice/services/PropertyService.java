@@ -10,8 +10,8 @@ public interface PropertyService {
 
     List<Property> findAll();
     Property getPropertyById(Long id);
-    Property save(Property property);
-    Property updatePropertyById(Long id, Property updatedProperty);
+    Property save(Property property, String token);
+    Property updatePropertyById(Long id, Property updatedProperty, String token);
     Boolean isPropertyAvailable(Long propertyId, LocalDate checkIn, LocalDate checkOut);
     List<LocalDate> getAvailableDates(Long propertyId);
     List<Property> search(String location, BigDecimal minPrice, BigDecimal maxPrice);

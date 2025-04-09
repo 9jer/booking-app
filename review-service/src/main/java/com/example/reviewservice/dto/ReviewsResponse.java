@@ -10,5 +10,5 @@ import java.util.List;
 @Getter
 @Setter
 public class ReviewsResponse {
-    private List<ReviewDTO> reviews;
+    private List<GetReviewDTO> reviews;
 }

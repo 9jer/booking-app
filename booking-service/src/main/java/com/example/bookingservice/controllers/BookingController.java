@@ -1,9 +1,6 @@
 package com.example.bookingservice.controllers;
 
-import com.example.bookingservice.dto.BookingDTO;
-import com.example.bookingservice.dto.BookingHistoryResponse;
-import com.example.bookingservice.dto.BookingHistoryDTO;
-import com.example.bookingservice.dto.BookingsResponse;
+import com.example.bookingservice.dto.*;
 import com.example.bookingservice.models.Booking;
 import com.example.bookingservice.models.BookingHistory;
 import com.example.bookingservice.models.BookingStatus;
@@ -40,14 +37,14 @@ public class BookingController {
         return ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(new BookingsResponse(bookingService.getAllBookings().stream()
-                        .map(this::convertBookingToBookingDTO).collect(Collectors.toList())));
+                        .map(this::convertBookingToGetBookingDTO).collect(Collectors.toList())));
     }
 
     @GetMapping(path = "${application.endpoint.id}")
-    public ResponseEntity<BookingDTO> getBookingById(@PathVariable("id") Long id){
+    public ResponseEntity<GetBookingDTO> getBookingById(@PathVariable("id") Long id){
         return ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_JSON)
-                .body(convertBookingToBookingDTO(bookingService.getBookingById(id)));
+                .body(convertBookingToGetBookingDTO(bookingService.getBookingById(id)));
     }
 
     @GetMapping(path = "${application.endpoint.booking-history-by-id}")
@@ -59,14 +56,17 @@ public class BookingController {
     }
 
     @PostMapping
-    public ResponseEntity<Booking> createBooking(@RequestBody @Valid BookingDTO bookingDTO, BindingResult bindingResult){
+    public ResponseEntity<Booking> createBooking(@RequestHeader("Authorization") String authorizationHeader,
+                                                 @RequestBody @Valid BookingDTO bookingDTO, BindingResult bindingResult){
         Booking booking = convertBookingDTOToBooking(bookingDTO);
 
         if(bindingResult.hasErrors()){
             ErrorsUtil.returnAllErrors(bindingResult);
         }
 
-        Booking createdBooking = bookingService.createBooking(booking);
+        String jwtToken = authorizationHeader.replace("Bearer ", "");
+
+        Booking createdBooking = bookingService.createBooking(booking, jwtToken);
 
         URI location = URI.create(rootEndpointUri + "/" + createdBooking.getId());
         return ResponseEntity.created(location)
@@ -102,15 +102,15 @@ public class BookingController {
                 .body(bookingService.getAvailableDates(propertyId));
     }
 
-    private BookingDTO convertBookingToBookingDTO(Booking booking){
-        BookingDTO bookingDTO = modelMapper.map(booking, BookingDTO.class);
+    private GetBookingDTO convertBookingToGetBookingDTO(Booking booking){
+        GetBookingDTO getBookingDTO = modelMapper.map(booking, GetBookingDTO.class);
 
-        return bookingDTO;
+        return getBookingDTO;
     }
 
     private Booking convertBookingDTOToBooking(BookingDTO bookingDTO){
         Booking booking = new Booking();
-        booking.setUserId(bookingDTO.getUserId());
+        //booking.setUserId(bookingDTO.getUserId());
         booking.setPropertyId(bookingDTO.getPropertyId());
         booking.setStatus(bookingDTO.getStatus());
         booking.setCheckInDate(bookingDTO.getCheckInDate());
