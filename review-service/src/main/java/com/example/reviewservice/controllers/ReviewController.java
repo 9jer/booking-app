@@ -50,13 +50,12 @@ public class ReviewController {
     }
 
     private Review convertReviewDTOToReview(ReviewDTO reviewDTO) {
-        Review review = new Review();
-        //review.setUserId(reviewDTO.getUserId());
+      /*  Review review = new Review();
         review.setPropertyId(reviewDTO.getPropertyId());
         review.setRating(reviewDTO.getRating());
-        review.setComment(reviewDTO.getComment());
+        review.setComment(reviewDTO.getComment());*/
 
-        return review;
+        return modelMapper.map(reviewDTO, Review.class);
     }
 
     private GetReviewDTO convertReviewToGetReviewDTO(Review review) {
