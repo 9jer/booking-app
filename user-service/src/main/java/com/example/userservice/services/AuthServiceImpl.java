@@ -1,5 +1,6 @@
 package com.example.userservice.services;
 
+import com.example.userservice.controllers.AuthController;
 import com.example.userservice.dto.JwtRequest;
 import com.example.userservice.dto.JwtResponse;
 import com.example.userservice.dto.SaveUserDTO;
@@ -11,6 +12,8 @@ import com.example.userservice.util.ErrorsUtil;
 import com.example.userservice.util.JwtTokenUtils;
 import lombok.RequiredArgsConstructor;
 import org.modelmapper.ModelMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -28,12 +31,15 @@ public class AuthServiceImpl implements AuthService {
     private final JwtTokenUtils jwtTokenUtils;
     private final AuthenticationManager authenticationManager;
     private final ModelMapper modelMapper;
+    private final Logger LOG = LoggerFactory.getLogger(AuthServiceImpl.class);
 
     @Override
     public JwtResponse createAuthToken(JwtRequest authRequest) {
+        LOG.info("Attempting to authenticate user: {}", authRequest.getUsername());
         try{
             authenticationManager.authenticate(new UsernamePasswordAuthenticationToken(authRequest.getUsername(), authRequest.getPassword()));
         } catch (BadCredentialsException e) {
+            LOG.error("Authentication failed for user: {}", authRequest.getUsername(), e);
             System.out.println("Bad credentials: " + authRequest.getUsername());
             throw new AuthException("Incorrect login or password!");
         }

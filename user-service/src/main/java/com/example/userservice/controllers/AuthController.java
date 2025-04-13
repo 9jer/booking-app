@@ -9,6 +9,8 @@ import com.example.userservice.util.ErrorsUtil;
 import com.example.userservice.util.UserException;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -20,9 +22,12 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("${application.endpoint.auth.root}")
 public class AuthController {
     private final AuthService authService;
+    private final Logger LOG = LoggerFactory.getLogger(AuthController.class);
 
     @PostMapping(path = "${application.endpoint.auth.sign-in}")
     public ResponseEntity<?> createAuthToken(@RequestBody @Valid JwtRequest authRequest, BindingResult bindingResult) {
+
+        LOG.info("Received auth request: {}", authRequest);
 
         if (bindingResult.hasErrors()) {
             ErrorsUtil.returnAllErrors(bindingResult);
