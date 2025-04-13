@@ -29,6 +29,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/v1/properties").hasRole("OWNER")
                         .requestMatchers(HttpMethod.PATCH, "/api/v1/properties/{id}").hasRole("OWNER")
                         .requestMatchers(HttpMethod.DELETE, "/api/v1/properties/{id}").hasRole("OWNER")
+                        .requestMatchers("/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**").permitAll()
                         .anyRequest().authenticated()
                 )
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))

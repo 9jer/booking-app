@@ -10,6 +10,22 @@ spring:
       filter:
         enabled: true
 
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+    urls:
+      - name: Booking Service
+        url: /aggregate/booking-service/v3/api-docs
+      - name: Property Service
+        url: /aggregate/property-service/v3/api-docs
+      - name: Review Service
+        url: /aggregate/review-service/v3/api-docs
+      - name: User Service
+        url: /aggregate/user-service/v3/api-docs
+    validator-url: null
+  api-docs:
+    path: /v3/api-docs
+
 eureka:
   client:
     serviceUrl:
