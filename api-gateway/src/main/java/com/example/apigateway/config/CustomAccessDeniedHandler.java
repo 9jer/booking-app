@@ -1,32 +1,43 @@
 package com.example.apigateway.config;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import jakarta.servlet.ServletException;
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
+import org.apache.http.HttpStatus;
+import org.springframework.http.HttpStatusCode;
+import org.springframework.http.MediaType;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.web.access.AccessDeniedHandler;
+import org.springframework.security.web.server.authorization.ServerAccessDeniedHandler;
 import org.springframework.stereotype.Component;
+import org.springframework.web.server.ServerWebExchange;
+import reactor.core.publisher.Mono;
 
-import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
 @Component
-public class CustomAccessDeniedHandler implements AccessDeniedHandler {
+public class CustomAccessDeniedHandler implements ServerAccessDeniedHandler {
+
     @Override
-    public void handle(HttpServletRequest request, HttpServletResponse response, AccessDeniedException accessDeniedException) throws IOException, ServletException {
-        response.setStatus(HttpServletResponse.SC_FORBIDDEN);
-        response.setContentType("application/json");
+    public Mono<Void> handle(ServerWebExchange exchange, AccessDeniedException denied) {
+        exchange.getResponse().setStatusCode(HttpStatusCode.valueOf(HttpStatus.SC_FORBIDDEN));
+        exchange.getResponse().getHeaders().setContentType(MediaType.APPLICATION_JSON);
 
         Map<String, Object> errorDetails = new HashMap<>();
         errorDetails.put("timestamp", System.currentTimeMillis());
-        errorDetails.put("status", HttpServletResponse.SC_FORBIDDEN);
+        errorDetails.put("status", HttpStatus.SC_FORBIDDEN);
         errorDetails.put("error", "Forbidden");
         errorDetails.put("message", "You do not have permission to access this resource.");
-        errorDetails.put("path", request.getRequestURI());
+        errorDetails.put("path", exchange.getRequest().getURI().getPath());
 
-        ObjectMapper mapper = new ObjectMapper();
-        response.getWriter().write(mapper.writeValueAsString(errorDetails));
+        try {
+            ObjectMapper mapper = new ObjectMapper();
+            byte[] bytes = mapper.writeValueAsBytes(errorDetails);
+            exchange.getResponse().getHeaders().setContentLength(bytes.length);
+            return exchange.getResponse().writeWith(Mono.just(exchange.getResponse().bufferFactory().wrap(bytes)));
+        } catch (JsonProcessingException e) {
+            return Mono.error(e);
+        }
     }
+
 }

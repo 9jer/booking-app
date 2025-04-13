@@ -1,7 +1,7 @@
 package com.example.apigateway.routes;
 
-import org.springframework.cloud.gateway.server.mvc.handler.GatewayRouterFunctions;
-import org.springframework.cloud.gateway.server.mvc.handler.HandlerFunctions;
+import org.springframework.cloud.gateway.route.RouteLocator;
+import org.springframework.cloud.gateway.route.builder.RouteLocatorBuilder;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.function.*;
@@ -10,38 +10,39 @@ import org.springframework.web.servlet.function.*;
 public class Routes {
 
     @Bean
-    public RouterFunction<ServerResponse> bookingServiceRoute() {
-        return GatewayRouterFunctions.route("booking_service")
-                .route(RequestPredicates.path("/api/v1/bookings/**"), HandlerFunctions.http("http://localhost:8082"))
+    public RouteLocator customRoutes(RouteLocatorBuilder builder) {
+        return builder.routes()
+                .route("booking_service", r -> r.path("/api/v1/bookings/**")
+                        .uri("lb://booking-service"))
+
+                .route("booking_service_swagger", r -> r.path("/aggregate/booking-service/v3/api-docs")
+                        .filters(f -> f.rewritePath("/aggregate/booking-service/v3/api-docs", "/v3/api-docs"))
+                        .uri("lb://booking-service"))
+
+                .route("property_service", r -> r.path("/api/v1/properties/**")
+                        .uri("lb://property-service"))
+
+                .route("property_service_swagger", r -> r.path("/aggregate/property-service/v3/api-docs")
+                        .filters(f -> f.rewritePath("/aggregate/property-service/v3/api-docs", "/v3/api-docs"))
+                        .uri("lb://property-service"))
+
+                .route("review_service", r -> r.path("/api/v1/reviews/**")
+                        .uri("lb://review-service"))
+
+                .route("review_service_swagger", r -> r.path("/aggregate/review-service/v3/api-docs")
+                        .filters(f -> f.rewritePath("/aggregate/review-service/v3/api-docs", "/v3/api-docs"))
+                        .uri("lb://review-service"))
+
+                .route("user_service", r -> r.path("/api/v1/users/**")
+                        .uri("lb://user-service"))
+
+                .route("auth_service", r -> r.path("/api/v1/auth/**")
+                        .uri("lb://user-service"))
+
+                .route("user_service_swagger", r -> r.path("/aggregate/user-service/v3/api-docs")
+                        .filters(f -> f.rewritePath("/aggregate/user-service/v3/api-docs", "/v3/api-docs"))
+                        .uri("lb://user-service"))
+
                 .build();
     }
-
-    @Bean
-    public RouterFunction<ServerResponse> propertyServiceRoute() {
-        return GatewayRouterFunctions.route("property_service")
-                .route(RequestPredicates.path("/api/v1/properties/**"), HandlerFunctions.http("http://localhost:8081"))
-                .build();
-    }
-
-    @Bean
-    public RouterFunction<ServerResponse> reviewServiceRoute() {
-        return GatewayRouterFunctions.route("review_service")
-                .route(RequestPredicates.path("/api/v1/reviews/**"), HandlerFunctions.http("http://localhost:8083"))
-                .build();
-    }
-
-    @Bean
-    public RouterFunction<ServerResponse> userServiceRoute() {
-        return GatewayRouterFunctions.route("user_service")
-                .route(RequestPredicates.path("/api/v1/users/**"), HandlerFunctions.http("http://localhost:8084"))
-                .build();
-    }
-
-    @Bean
-    public RouterFunction<ServerResponse> authServiceRoute() {
-        return GatewayRouterFunctions.route("auth_service")
-                .route(RequestPredicates.path("/api/v1/auth/**"), HandlerFunctions.http("http://localhost:8084"))
-                .build();
-    }
-
 }
