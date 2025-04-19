@@ -32,6 +32,7 @@ public class JwtTokenUtils {
                 .map(GrantedAuthority::getAuthority).toList();
         claims.put("roles", roleList);
         claims.put("id", ((CustomUserDetails) userDetails).getId());
+        claims.put("email", ((CustomUserDetails) userDetails).getUser().getEmail());
 
         Date issuedDate = new Date();
         Date expiredDate = new Date(issuedDate.getTime() + jwtLifetime.toMillis());
@@ -63,6 +64,10 @@ public class JwtTokenUtils {
 
     public List<String> getRoles(String token) {
         return getClaimsFromToken(token).get("roles", List.class);
+    }
+
+    public String getEmail(String token) {
+        return getClaimsFromToken(token).get("email", String.class);
     }
 
     private Claims getClaimsFromToken(String token) {
