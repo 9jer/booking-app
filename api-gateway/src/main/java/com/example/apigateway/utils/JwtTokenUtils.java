@@ -16,22 +16,11 @@ public class JwtTokenUtils {
     private String secret;
 
     public String getUsername(String token) {
-        return Jwts.parser()
-                .verifyWith(Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8)))
-                .build()
-                .parseSignedClaims(token)
-                .getPayload()
-                .getSubject();
+        return getClaimsFromToken(token).getSubject();
     }
 
     public List<String> getRoles(String token) {
-        Claims claims = Jwts.parser()
-                .verifyWith(Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8)))
-                .build()
-                .parseSignedClaims(token)
-                .getPayload();
-
-        Object roles = claims.get("roles");
+        Object roles = getClaimsFromToken(token).get("roles");
 
         if (roles instanceof List<?> roleList) {
             return roleList.stream()
@@ -41,5 +30,13 @@ public class JwtTokenUtils {
         } else {
             throw new IllegalArgumentException("Invalid roles format in JWT");
         }
+    }
+
+    private Claims getClaimsFromToken(String token) {
+        return Jwts.parser()
+                .verifyWith(Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8)))
+                .build()
+                .parseSignedClaims(token)
+                .getPayload();
     }
 }

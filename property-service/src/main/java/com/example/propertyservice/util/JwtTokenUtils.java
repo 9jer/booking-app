@@ -16,31 +16,22 @@ public class JwtTokenUtils {
     private String secret;
 
     public String getUsername(String token) {
+        return getClaimsFromToken(token).getSubject();
+    }
+
+    public Long getUserId(String token) {
+        return getClaimsFromToken(token).get("id", Long.class);
+    }
+
+    public List<String> getRoles(String token) {
+        return getClaimsFromToken(token).get("roles", List.class);
+    }
+
+    private Claims getClaimsFromToken(String token) {
         return Jwts.parser()
                 .verifyWith(Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8)))
                 .build()
                 .parseSignedClaims(token)
-                .getPayload()
-                .getSubject();
-    }
-
-    public Long getUserId(String token) {
-        Claims claims = Jwts.parser()
-                .verifyWith(Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8)))
-                .build()
-                .parseSignedClaims(token)
                 .getPayload();
-
-        return claims.get("id", Long.class);
-    }
-
-    public List<String> getRoles(String token) {
-        Claims claims = Jwts.parser()
-                .verifyWith(Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8)))
-                .build()
-                .parseSignedClaims(token)
-                .getPayload();
-
-        return claims.get("roles", List.class);
     }
 }
