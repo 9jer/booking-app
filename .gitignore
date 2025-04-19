@@ -14,6 +14,7 @@ api-gateway/src/main/resources/secrets.properties
 .idea/jarRepositories.xml
 .idea/compiler.xml
 .idea/libraries/
+.idea/dataSources.xml
 *.iws
 *.iml
 *.ipr
