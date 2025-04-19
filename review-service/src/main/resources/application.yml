@@ -7,7 +7,7 @@ spring:
 
   datasource:
     driver-class-name: org.postgresql.Driver
-    url: jdbc:postgresql://localhost:5432/review_service_db
+    url: jdbc:postgresql://localhost:5435/review_service_db
     username: postgres
     password: postgres
 

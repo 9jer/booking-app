@@ -1,0 +1,58 @@
+services:
+  postgres-booking:
+    image: postgres:latest
+    container_name: postgres-booking
+    environment:
+      POSTGRES_DB: booking_service_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5433:5432"
+    volumes:
+      - pg_booking:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  postgres-property:
+    image: postgres:latest
+    container_name: postgres-property
+    environment:
+      POSTGRES_DB: property_service_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5434:5432"
+    volumes:
+      - pg_property:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  postgres-review:
+    image: postgres:latest
+    container_name: postgres-review
+    environment:
+      POSTGRES_DB: review_service_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5435:5432"
+    volumes:
+      - pg_review:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  postgres-user:
+    image: postgres:latest
+    container_name: postgres-user
+    environment:
+      POSTGRES_DB: user_service_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5436:5432"
+    volumes:
+      - pg_user:/var/lib/postgresql/data
+    restart: unless-stopped
+
+volumes:
+  pg_booking:
+  pg_property:
+  pg_review:
+  pg_user:
