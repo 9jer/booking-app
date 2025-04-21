@@ -1,12 +1,13 @@
-
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="DataSourceManagerImpl" format="xml" multifile-model="true">
-    <data-source source="LOCAL" name="booking_app_db@localhost" uuid="e42ebc03-422d-4af1-97cd-2977b5f8f9fa">
+    <data-source source="LOCAL" name="user_service_db@localhost" uuid="b70c9220-b468-4d85-a5eb-4651a24b44a5">
       <driver-ref>postgresql</driver-ref>
       <synchronize>true</synchronize>
+      <imported>true</imported>
+      <remarks>$PROJECT_DIR$/user-service/src/main/resources/application.yml</remarks>
       <jdbc-driver>org.postgresql.Driver</jdbc-driver>
-      <jdbc-url>jdbc:postgresql://localhost:5432/booking_app_db</jdbc-url>
+      <jdbc-url>jdbc:postgresql://localhost:5436/user_service_db</jdbc-url>
       <jdbc-additional-properties>
         <property name="com.intellij.clouds.kubernetes.db.host.port" />
         <property name="com.intellij.clouds.kubernetes.db.enabled" value="false" />
@@ -14,21 +15,11 @@
       </jdbc-additional-properties>
       <working-dir>$ProjectFileDir$</working-dir>
     </data-source>
-    <data-source source="LOCAL" name="booking_service_db@localhost" uuid="cc7fd3cf-509f-483d-9ec9-974d39c89cb2">
+    <data-source source="LOCAL" name="property_service_db@localhost" uuid="3b65c1a1-ad36-4ae2-9d5c-a9a6db4ef8e3">
       <driver-ref>postgresql</driver-ref>
       <synchronize>true</synchronize>
-      <jdbc-driver>org.postgresql.Driver</jdbc-driver>
-      <jdbc-url>jdbc:postgresql://localhost:5433/booking_service_db</jdbc-url>
-      <jdbc-additional-properties>
-        <property name="com.intellij.clouds.kubernetes.db.host.port" />
-        <property name="com.intellij.clouds.kubernetes.db.enabled" value="false" />
-        <property name="com.intellij.clouds.kubernetes.db.container.port" />
-      </jdbc-additional-properties>
-      <working-dir>$ProjectFileDir$</working-dir>
-    </data-source>
-    <data-source source="LOCAL" name="property_service_db@localhost" uuid="154fc165-7261-4d55-9459-5adbd7879bc0">
-      <driver-ref>postgresql</driver-ref>
-      <synchronize>true</synchronize>
+      <imported>true</imported>
+      <remarks>$PROJECT_DIR$/property-service/src/main/resources/application.yml</remarks>
       <jdbc-driver>org.postgresql.Driver</jdbc-driver>
       <jdbc-url>jdbc:postgresql://localhost:5434/property_service_db</jdbc-url>
       <jdbc-additional-properties>
@@ -38,9 +29,11 @@
       </jdbc-additional-properties>
       <working-dir>$ProjectFileDir$</working-dir>
     </data-source>
-    <data-source source="LOCAL" name="review_service_db@localhost" uuid="f70fa09f-ee63-4978-8604-d15c2bcb2e02">
+    <data-source source="LOCAL" name="review_service_db@localhost" uuid="7f4bfbc4-8b79-46d4-9fd6-9558b25fb341">
       <driver-ref>postgresql</driver-ref>
       <synchronize>true</synchronize>
+      <imported>true</imported>
+      <remarks>$PROJECT_DIR$/review-service/src/main/resources/application.yml</remarks>
       <jdbc-driver>org.postgresql.Driver</jdbc-driver>
       <jdbc-url>jdbc:postgresql://localhost:5435/review_service_db</jdbc-url>
       <jdbc-additional-properties>
@@ -50,11 +43,13 @@
       </jdbc-additional-properties>
       <working-dir>$ProjectFileDir$</working-dir>
     </data-source>
-    <data-source source="LOCAL" name="user_service_db@localhost" uuid="d1479a00-9b69-4108-ac5a-8a3ee78790c2">
+    <data-source source="LOCAL" name="booking_service_db@localhost" uuid="d20eb1ba-949e-4cc1-a25d-fdaeca375811">
       <driver-ref>postgresql</driver-ref>
       <synchronize>true</synchronize>
+      <imported>true</imported>
+      <remarks>$PROJECT_DIR$/booking-service/src/main/resources/application.yml</remarks>
       <jdbc-driver>org.postgresql.Driver</jdbc-driver>
-      <jdbc-url>jdbc:postgresql://localhost:5436/user_service_db</jdbc-url>
+      <jdbc-url>jdbc:postgresql://localhost:5433/booking_service_db</jdbc-url>
       <jdbc-additional-properties>
         <property name="com.intellij.clouds.kubernetes.db.host.port" />
         <property name="com.intellij.clouds.kubernetes.db.enabled" value="false" />

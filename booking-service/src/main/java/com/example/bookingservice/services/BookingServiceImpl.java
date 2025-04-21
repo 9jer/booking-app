@@ -2,6 +2,8 @@ package com.example.bookingservice.services;
 
 import com.example.bookingservice.client.PropertyClient;
 import com.example.bookingservice.client.UserClient;
+import com.example.bookingservice.event.BookingCreatedEvent;
+import com.example.bookingservice.event.BookingCreatedEventProducer;
 import com.example.bookingservice.models.Booking;
 import com.example.bookingservice.models.BookingHistory;
 import com.example.bookingservice.models.BookingStatus;
@@ -10,6 +12,7 @@ import com.example.bookingservice.repositories.BookingRepository;
 import com.example.bookingservice.util.BookingException;
 import com.example.bookingservice.util.JwtTokenUtils;
 import lombok.RequiredArgsConstructor;
+import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -27,6 +30,7 @@ public class BookingServiceImpl implements BookingService {
     private final PropertyClient propertyClient;
     private final UserClient userClient;
     private final JwtTokenUtils jwtTokenUtils;
+    private final BookingCreatedEventProducer producer;
 
     @Override
     public List<Booking> getAllBookings() {
@@ -75,6 +79,12 @@ public class BookingServiceImpl implements BookingService {
         booking.setCreatedAt(LocalDateTime.now());
         Booking savedBooking = bookingRepository.save(booking);
         saveHistory(savedBooking, BookingStatus.PENDING);
+
+        BookingCreatedEvent bookingCreatedEvent = new BookingCreatedEvent(booking.getId()
+                , jwtTokenUtils.getEmail(token), booking.getCheckInDate(), booking.getCheckOutDate());
+
+        producer.sendBookingCreatedEvent("booking-created", bookingCreatedEvent);
+
         return savedBooking;
     }
 
