@@ -1,0 +1,31 @@
+spring:
+  application:
+    name: notification-service
+
+  config:
+    import: optional:classpath:app.properties
+
+  kafka:
+    bootstrap-servers: localhost:9092
+    consumer:
+      group-id: notificationService
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.type.mapping: event:com.example.bookingservice.event.BookingCreatedEvent
+
+  mail:
+    host: sandbox.smtp.mailtrap.io
+    port: 2525
+    username: ${mail.username}
+    password: ${mail.password}
+
+eureka:
+  client:
+    serviceUrl:
+      defaultZone: http://localhost:8761/eureka
+  instance:
+    prefer-ip-address: true
+
+server:
+  port: 8085

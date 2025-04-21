@@ -7,6 +7,7 @@ review-service/src/main/resources/secrets.properties
 property-service/src/main/resources/secrets.properties
 booking-service/src/main/resources/secrets.properties
 api-gateway/src/main/resources/secrets.properties
+notification-service/src/main/resources/app.properties
 
 
 ### IntelliJ IDEA ###
