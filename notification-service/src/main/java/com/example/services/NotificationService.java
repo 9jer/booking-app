@@ -30,14 +30,16 @@ public class NotificationService {
                                         
                     Your booking has been successfully created. Here are the details:
                                         
-                    📌 Booking ID: %d
-                    📅 Stay period: from %s to %s 
+                    📌   Booking ID: %d
+                    🏠   Property name: %s
+                    📅   Stay period: from %s to %s 
                                         
                     If you have any questions, feel free to contact our support team.
                                         
                     Have a great day!
                     """,
                     bookingCreatedEvent.getBookingId(),
+                    bookingCreatedEvent.getPropertyName(),
                     bookingCreatedEvent.getCheckInDate().toString(),
                     bookingCreatedEvent.getCheckOutDate().toString()
             ));

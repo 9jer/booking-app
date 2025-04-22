@@ -14,6 +14,7 @@ public class BookingCreatedEvent {
 
     private Long bookingId;
     private String email;
+    private String propertyName;
     private LocalDate checkInDate;
     private LocalDate checkOutDate;
 }

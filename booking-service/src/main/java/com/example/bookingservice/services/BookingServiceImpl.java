@@ -12,7 +12,6 @@ import com.example.bookingservice.repositories.BookingRepository;
 import com.example.bookingservice.util.BookingException;
 import com.example.bookingservice.util.JwtTokenUtils;
 import lombok.RequiredArgsConstructor;
-import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -75,13 +74,14 @@ public class BookingServiceImpl implements BookingService {
             throw new BookingException("Property is not available");
         }
 
-        booking.setStatus(BookingStatus.PENDING);
+        //booking.setStatus(BookingStatus.PENDING);
         booking.setCreatedAt(LocalDateTime.now());
         Booking savedBooking = bookingRepository.save(booking);
-        saveHistory(savedBooking, BookingStatus.PENDING);
+        saveHistory(savedBooking, booking.getStatus());
 
-        BookingCreatedEvent bookingCreatedEvent = new BookingCreatedEvent(booking.getId()
-                , jwtTokenUtils.getEmail(token), booking.getCheckInDate(), booking.getCheckOutDate());
+        BookingCreatedEvent bookingCreatedEvent = new BookingCreatedEvent(booking
+                .getId(), jwtTokenUtils.getEmail(token), propertyClient.getPropertyById(booking
+                .getPropertyId()).getTitle(),booking.getCheckInDate(), booking.getCheckOutDate());
 
         producer.sendBookingCreatedEvent("booking-created", bookingCreatedEvent);
 

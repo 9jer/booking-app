@@ -63,6 +63,7 @@ feign-client:
   endpoint:
     property-exists: /api/v1/properties/{id}/exists
     user-exists: api/v1/users/{id}/exists
+    get-property-by-id: /api/v1/properties/{id}
 
 
 
