@@ -1,0 +1,12 @@
+{
+    "type": "record",
+    "name": "BookingCreatedEvent",
+    "namespace": "com.example.bookingservice.event",
+    "fields": [
+        { "name": "bookingId", "type": "long" },
+        { "name": "email", "type": "string" },
+        { "name": "propertyName", "type": "string" },
+        { "name": "checkInDate", "type": "string" },
+        { "name": "checkOutDate", "type": "string" }
+    ]
+}

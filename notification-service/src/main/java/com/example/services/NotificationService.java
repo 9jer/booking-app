@@ -23,7 +23,7 @@ public class NotificationService {
         MimeMessagePreparator messagePreparator = mimeMessage -> {
             MimeMessageHelper messageHelper = new MimeMessageHelper(mimeMessage);
             messageHelper.setFrom("springbooking@email.com");
-            messageHelper.setTo(bookingCreatedEvent.getEmail());
+            messageHelper.setTo(bookingCreatedEvent.getEmail().toString());
             messageHelper.setSubject(String.format("Booking №%s successfully created", bookingCreatedEvent.getBookingId()));
             messageHelper.setText(String.format("""
                     Hello!
@@ -40,8 +40,8 @@ public class NotificationService {
                     """,
                     bookingCreatedEvent.getBookingId(),
                     bookingCreatedEvent.getPropertyName(),
-                    bookingCreatedEvent.getCheckInDate().toString(),
-                    bookingCreatedEvent.getCheckOutDate().toString()
+                    bookingCreatedEvent.getCheckInDate(),
+                    bookingCreatedEvent.getCheckOutDate()
             ));
         };
 

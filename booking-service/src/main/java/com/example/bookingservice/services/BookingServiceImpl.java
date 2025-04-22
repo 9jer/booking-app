@@ -79,9 +79,13 @@ public class BookingServiceImpl implements BookingService {
         Booking savedBooking = bookingRepository.save(booking);
         saveHistory(savedBooking, booking.getStatus());
 
-        BookingCreatedEvent bookingCreatedEvent = new BookingCreatedEvent(booking
-                .getId(), jwtTokenUtils.getEmail(token), propertyClient.getPropertyById(booking
-                .getPropertyId()).getTitle(),booking.getCheckInDate(), booking.getCheckOutDate());
+        BookingCreatedEvent bookingCreatedEvent = new BookingCreatedEvent();
+        bookingCreatedEvent.setBookingId(booking.getId());
+        bookingCreatedEvent.setEmail(jwtTokenUtils.getEmail(token));
+        bookingCreatedEvent.setPropertyName(propertyClient.getPropertyById(booking
+                .getPropertyId()).getTitle());
+        bookingCreatedEvent.setCheckInDate(booking.getCheckInDate().toString());
+        bookingCreatedEvent.setCheckOutDate(booking.getCheckOutDate().toString());
 
         producer.sendBookingCreatedEvent("booking-created", bookingCreatedEvent);
 

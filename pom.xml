@@ -35,7 +35,23 @@
     <modelmapper.version>3.2.1</modelmapper.version>
     <junit.version>4.13.2</junit.version>
     <feign-httpclient.version>13.5</feign-httpclient.version>
+    <kafka-avro-serializer.version>7.9.0</kafka-avro-serializer.version>
+    <kafka-schema-registry-client.version>7.9.0</kafka-schema-registry-client.version>
+    <avro.version>1.12.0</avro.version>
   </properties>
+
+  <repositories>
+    <repository>
+      <id>confluent</id>
+      <url>https://packages.confluent.io/maven/</url>
+      <releases>
+        <enabled>true</enabled>
+      </releases>
+      <snapshots>
+        <enabled>false</enabled>
+      </snapshots>
+    </repository>
+  </repositories>
 
   <dependencies>
     <dependency>
@@ -87,6 +103,24 @@
         <artifactId>feign-httpclient</artifactId>
         <version>${feign-httpclient.version}</version>
       </dependency>
+
+      <dependency>
+        <groupId>io.confluent</groupId>
+        <artifactId>kafka-avro-serializer</artifactId>
+        <version>${kafka-avro-serializer.version}</version>
+      </dependency>
+
+      <dependency>
+        <groupId>io.confluent</groupId>
+        <artifactId>kafka-schema-registry-client</artifactId>
+        <version>${kafka-schema-registry-client.version}</version>
+      </dependency>
+
+      <dependency>
+        <groupId>org.apache.avro</groupId>
+        <artifactId>avro</artifactId>
+        <version>${avro.version}</version>
+      </dependency>
     </dependencies>
 
   </dependencyManagement>
@@ -106,6 +140,27 @@
         </configuration>
       </plugin>
     </plugins>
+    <pluginManagement>
+      <plugins>
+        <plugin>
+          <groupId>org.apache.avro</groupId>
+          <artifactId>avro-maven-plugin</artifactId>
+          <version>1.10.2</version>
+          <executions>
+            <execution>
+              <phase>generate-sources</phase>
+              <goals>
+                <goal>schema</goal>
+              </goals>
+              <configuration>
+                <sourceDirectory>${project.basedir}/src/main/resources/avro</sourceDirectory>
+                <outputDirectory>${project.basedir}/src/main/java/</outputDirectory>
+              </configuration>
+            </execution>
+          </executions>
+        </plugin>
+      </plugins>
+    </pluginManagement>
   </build>
 
 </project>

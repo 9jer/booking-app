@@ -3,16 +3,17 @@ spring:
     name: notification-service
 
   config:
-    import: optional:classpath:app.properties
+    import: optional:classpath:secrets.properties
 
   kafka:
     bootstrap-servers: localhost:9092
     consumer:
       group-id: notificationService
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
-      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      value-deserializer: io.confluent.kafka.serializers.KafkaAvroDeserializer
       properties:
-        spring.json.type.mapping: event:com.example.bookingservice.event.BookingCreatedEvent
+        schema.registry.url: http://127.0.0.1:8086
+        specific.avro.reader: true
 
   mail:
     host: sandbox.smtp.mailtrap.io
