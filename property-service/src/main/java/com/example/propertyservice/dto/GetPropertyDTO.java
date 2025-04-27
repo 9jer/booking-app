@@ -26,6 +26,8 @@ public class GetPropertyDTO {
     @NotEmpty(message = "Location should not be empty!")
     private String location;
 
+    private BigDecimal averageRating;
+
     @NotNull(message = "Price per night should not be empty!")
     private BigDecimal pricePerNight;
 

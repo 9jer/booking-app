@@ -3,6 +3,7 @@ package com.example.reviewservice.services;
 import com.example.reviewservice.client.BookingClient;
 import com.example.reviewservice.client.PropertyClient;
 import com.example.reviewservice.client.UserClient;
+import com.example.reviewservice.event.RatingEventProducer;
 import com.example.reviewservice.models.Review;
 import com.example.reviewservice.repositories.ReviewRepository;
 import com.example.reviewservice.util.JwtTokenUtils;
@@ -23,6 +24,7 @@ public class ReviewServiceImpl implements ReviewService {
     private final UserClient userClient;
     private final BookingClient bookingClient;
     private final JwtTokenUtils jwtTokenUtils;
+    private final RatingEventProducer ratingEventProducer;
 
     @Override
     public List<Review> getReviewsByPropertyId(Long propertyId) {
@@ -32,6 +34,7 @@ public class ReviewServiceImpl implements ReviewService {
     @Override
     @Transactional
     public Review saveReview(Review review, String token) {
+        review.setId(null);
         Boolean propertyExists = propertyClient.propertyExists(review.getPropertyId());
 
         review.setUserId(jwtTokenUtils.getUserId(token));
@@ -54,8 +57,20 @@ public class ReviewServiceImpl implements ReviewService {
                     " until you've lived there.");
         }
 
+        boolean alreadyReview = reviewRepository.existsByUserIdAndPropertyId(
+                review.getUserId(), review.getPropertyId()
+        );
+
+        if (alreadyReview) {
+            throw new ReviewException("You have already reviewed this property!");
+        }
+
         enrichReview(review);
-        return reviewRepository.save(review);
+        Review savedReview = reviewRepository.save(review);
+
+        ratingEventProducer.sendRatingUpdatedEvent(review.getPropertyId());
+
+        return savedReview;
     }
 
     private void enrichReview(Review review) {

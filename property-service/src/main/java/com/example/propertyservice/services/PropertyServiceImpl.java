@@ -120,6 +120,13 @@ public class PropertyServiceImpl implements PropertyService {
                 .collect(Collectors.toSet());
     }
 
+    @Transactional
+    public void updateAverageRating(Long propertyId, Double averageRating, Long totalReviews) {
+        var property = getPropertyById(propertyId);
+        property.setAverageRating(BigDecimal.valueOf(averageRating));
+        propertyRepository.save(property);
+    }
+
     @Override
     public Boolean existsById(Long id) {
         return propertyRepository.existsById(id);

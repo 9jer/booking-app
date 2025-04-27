@@ -39,6 +39,9 @@ public class Property {
     @NotEmpty(message = "Location should not be empty!")
     private String location;
 
+    @Column(name = "average_rating", precision = 3, scale = 2)
+    private BigDecimal averageRating;
+
     @Column(name = "price_per_night", precision = 10, scale = 2)
     @NotNull(message = "Price per night should not be empty!")
     private BigDecimal pricePerNight;
@@ -54,7 +57,6 @@ public class Property {
             inverseJoinColumns = @JoinColumn(name = "feature_id")
     )
     private Set<PropertyFeature> features;
-
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 

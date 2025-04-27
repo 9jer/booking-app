@@ -21,6 +21,15 @@ spring:
     hiddenmethod:
       filter:
         enabled: true
+  kafka:
+    bootstrap-servers: localhost:9092
+    consumer:
+      group-id: property-rating-updater
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: com.example.reviewservice.event
+        spring.json.value.default.type: com.example.reviewservice.event.RatingUpdatedEvent
 
 springdoc:
   swagger-ui:

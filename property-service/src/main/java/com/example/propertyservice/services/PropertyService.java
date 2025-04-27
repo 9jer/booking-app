@@ -15,6 +15,7 @@ public interface PropertyService {
     Boolean isPropertyAvailable(Long propertyId, LocalDate checkIn, LocalDate checkOut);
     List<LocalDate> getAvailableDates(Long propertyId);
     List<Property> search(String location, BigDecimal minPrice, BigDecimal maxPrice);
+    void updateAverageRating(Long propertyId, Double averageRating, Long totalReviews);
     Boolean existsById(Long id);
     void delete(Long id);
 
