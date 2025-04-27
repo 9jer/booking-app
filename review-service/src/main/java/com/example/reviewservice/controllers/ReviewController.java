@@ -49,12 +49,33 @@ public class ReviewController {
                 .body(reviewService.saveReview(review, jwtToken));
     }
 
-    private Review convertReviewDTOToReview(ReviewDTO reviewDTO) {
-      /*  Review review = new Review();
-        review.setPropertyId(reviewDTO.getPropertyId());
-        review.setRating(reviewDTO.getRating());
-        review.setComment(reviewDTO.getComment());*/
+    @PutMapping("/{id}")
+    public ResponseEntity<Review> updateReview(@RequestHeader("Authorization") String authorizationHeader
+            , @PathVariable(name = "id") Long id, @RequestBody @Valid ReviewDTO reviewDTO, BindingResult bindingResult) {
 
+        if(bindingResult.hasErrors()) {
+            ErrorsUtil.returnAllErrors(bindingResult);
+        }
+
+        String jwtToken = authorizationHeader.replace("Bearer ", "");
+        Review review = convertReviewDTOToReview(reviewDTO);
+        review.setId(id);
+
+        return ResponseEntity.ok()
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(reviewService.updateReview(review, jwtToken));
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deleteReview(@RequestHeader("Authorization") String authorizationHeader
+            , @PathVariable(name = "id") Long id) {
+        String jwtToken = authorizationHeader.replace("Bearer ", "");
+        reviewService.deleteReview(id, jwtToken);
+
+        return ResponseEntity.noContent().build();
+    }
+
+    private Review convertReviewDTOToReview(ReviewDTO reviewDTO) {
         return modelMapper.map(reviewDTO, Review.class);
     }
 

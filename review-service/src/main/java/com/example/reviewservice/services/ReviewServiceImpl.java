@@ -73,7 +73,58 @@ public class ReviewServiceImpl implements ReviewService {
         return savedReview;
     }
 
+    @Override
+    @Transactional
+    public Review updateReview(Review review, String token) {
+
+        Long userId = jwtTokenUtils.getUserId(token);
+
+        Review existingReview = reviewRepository.findById(review.getId()).orElseThrow(
+                () -> new ReviewException("Review with id " + review.getId() + " not found."));
+
+        if(!existingReview.getUserId().equals(userId)) {
+            throw new ReviewException("You can only update your own reviews");
+        }
+
+        if (!propertyClient.propertyExists(review.getPropertyId())) {
+            throw new ReviewException("Property with id " + review.getPropertyId() + " not found.");
+        }
+
+        existingReview.setRating(review.getRating());
+        existingReview.setComment(review.getComment());
+        enrichUpdatedReview(existingReview);
+
+        Review updatedReview = reviewRepository.save(existingReview);
+
+        ratingEventProducer.sendRatingUpdatedEvent(review.getPropertyId());
+
+        return updatedReview;
+    }
+
+    @Override
+    @Transactional
+    public void deleteReview(Long reviewId, String token) {
+        Long userId = jwtTokenUtils.getUserId(token);
+
+        Review existingReview = reviewRepository.findById(reviewId).orElseThrow(
+                () -> new ReviewException("Review with id " + reviewId + " not found."));
+
+        if (!existingReview.getUserId().equals(userId)) {
+            throw new ReviewException("You can only delete your own reviews");
+        }
+
+        Long propertyId = existingReview.getPropertyId();
+        reviewRepository.delete(existingReview);
+
+        ratingEventProducer.sendRatingUpdatedEvent(propertyId);
+    }
+
+    private void enrichUpdatedReview(Review existingReview) {
+        existingReview.setUpdatedAt(LocalDateTime.now());
+    }
+
     private void enrichReview(Review review) {
         review.setCreatedAt(LocalDateTime.now());
     }
+
 }
