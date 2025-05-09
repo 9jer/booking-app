@@ -137,13 +137,25 @@ This project is a platform for searching and booking short-term accommodations f
 
 3. **Set Up Database:**
 
-   Configure PostgreSQL in `application.properties`:
+Configure PostgreSQL in both `application.properties` and `application-docker.yml`:
 
-   ```properties
-   spring.datasource.url=jdbc:postgresql://localhost:5432/yourdbname
-   spring.datasource.username=yourusername
-   spring.datasource.password=yourpassword
-   ```
+**application.yml:**
+```yml
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/yourdbname
+    username: yourusername
+    password: yourpassword
+```
+
+**application-docker.yml:**
+```yml
+spring:
+  datasource:
+    url: jdbc:postgresql://yourhostname:5432/yourdbname
+    username: yourusername
+    password: yourpassword
+```
 
 4. **Run with Docker:**
 
