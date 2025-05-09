@@ -26,6 +26,7 @@ eureka:
     serviceUrl:
       defaultZone: http://localhost:8761/eureka
   instance:
+    instance-id: notification-service-instance-${random.uuid}
     prefer-ip-address: true
 
 server:

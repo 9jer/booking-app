@@ -46,7 +46,7 @@ eureka:
     serviceUrl:
       defaultZone: http://localhost:8761/eureka
   instance:
-    instance-id: booking-service-instance
+    instance-id: booking-service-instance-${random.uuid}
     prefer-ip-address: true
 
 server:

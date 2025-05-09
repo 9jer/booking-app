@@ -42,7 +42,7 @@ eureka:
     serviceUrl:
       defaultZone: http://localhost:8761/eureka
   instance:
-    instance-id: property-service-instance
+    instance-id: property-service-instance-${random.uuid}
     prefer-ip-address: true
 
 jwt:
