@@ -139,6 +139,21 @@
           </excludes>
         </configuration>
       </plugin>
+      <plugin>
+        <groupId>com.google.cloud.tools</groupId>
+        <artifactId>jib-maven-plugin</artifactId>
+        <version>3.4.4</version>
+        <configuration>
+          <from>
+            <image>eclipse-temurin:21-jre</image>
+          </from>
+          <to>
+            <image>
+              registry.hub.docker.com/90jer/${project.artifactId}
+            </image>
+          </to>
+        </configuration>
+      </plugin>
     </plugins>
     <pluginManagement>
       <plugins>
