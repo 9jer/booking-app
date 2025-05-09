@@ -26,7 +26,7 @@ public class SecurityConfig {
         http
                 .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers(HttpMethod.PATCH, "/api/v1/bookings/{id}/status").hasRole("OWNER")
+                        .requestMatchers(HttpMethod.PATCH, "/api/v1/bookings/{id}/status").hasAnyRole("OWNER", "ADMIN")
                         .requestMatchers("/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**").permitAll()
                         .anyRequest().authenticated()
                 )
