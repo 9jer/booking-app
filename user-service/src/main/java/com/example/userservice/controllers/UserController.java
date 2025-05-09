@@ -83,10 +83,6 @@ public class UserController {
         return modelMapper.map(user, UserDTO.class);
     }
 
-    private User convertUserDTOToUser(SaveUserDTO saveUserDTO){
-        return modelMapper.map(saveUserDTO, User.class);
-    }
-
     @ExceptionHandler
     private ResponseEntity<ErrorResponse> handleException(UserException e) {
         return ResponseEntity.badRequest()
