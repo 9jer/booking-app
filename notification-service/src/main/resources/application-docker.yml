@@ -1,0 +1,15 @@
+server:
+  port: 8085
+
+spring:
+  kafka:
+    bootstrap-servers: kafka:9092
+    consumer:
+      properties:
+        schema.registry.url: http://schema-registry:8081
+
+
+eureka:
+  client:
+    serviceUrl:
+      defaultZone: http://eureka:password@discovery-server:8761/eureka
