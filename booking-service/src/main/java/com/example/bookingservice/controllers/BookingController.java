@@ -107,18 +107,7 @@ public class BookingController {
     }
 
     private Booking convertBookingDTOToBooking(BookingDTO bookingDTO){
-/*
-        Booking booking = new Booking();
-        booking.setPropertyId(bookingDTO.getPropertyId());
-        booking.setStatus(bookingDTO.getStatus());
-        booking.setCheckInDate(bookingDTO.getCheckInDate());
-        booking.setCheckOutDate(bookingDTO.getCheckOutDate());
-*/
         return modelMapper.map(bookingDTO, Booking.class);
-    }
-
-    private BookingHistory convertBookingHistoryDTOToBookingHistory(BookingHistoryDTO bookingHistoryDTO){
-        return modelMapper.map(bookingHistoryDTO, BookingHistory.class);
     }
 
     private BookingHistoryDTO convertBookingHistoryToBookingHistoryDTO(BookingHistory bookingHistory){
