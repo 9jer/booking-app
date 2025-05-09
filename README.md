@@ -1,95 +1,195 @@
 # Short-Term Housing Search and Booking Platform
 
-## Description
-
 This project is a platform for searching and booking short-term accommodations for tourists, similar to Airbnb. The application is built using microservices architecture, and it allows users to search for available properties, make bookings, manage property listings, and leave reviews. The system is developed with Java, Spring Framework, and various technologies for microservice-based architecture.
 
-### Key Features:
-- User registration and authentication
-- Property search and booking management
-- Review system for guests and property owners
-- Scalable microservice-based architecture
-- API integration for user, property, and booking management
-- JWT-based security for authorization and authentication
+---
 
 ## Table of Contents
 
-1. [Technologies Used](#technologies-used)
-2. [Installation Guide](#installation-guide)
-3. [Usage Instructions](#usage-instructions)
-4. [Contact](#contact)
+1. [Features](#features)
+2. [Technologies Used](#technologies-used)
+3. [Modules](#modules)
+4. [Prerequisites](#prerequisites)
+5. [Installation Guide](#installation-guide)
+6. [Usage Instructions](#usage-instructions)
+7. [Testing](#testing)
+8. [Contact](#contact)
+
+---
+
+## Features
+
+1. **Microservice Architecture:**
+
+   * Independent databases per microservice ensuring data isolation and security.
+   * Supports both synchronous (REST API) and asynchronous (Kafka) inter-service communications.
+
+2. **User Management:**
+
+   * User registration and JWT-based authentication.
+
+3. **Property Management:**
+
+   * Detailed property listings.
+   * Management of property features and availability.
+
+4. **Booking Management:**
+
+   * Automatic extraction of user ID from JWT for secure booking operations.
+   * Real-time booking status updates (e.g., cancellation).
+
+5. **Review System:**
+
+   * Verified feedback system ensuring reviews are from actual guests.
+   * Automatic verification of user-property interactions through bookings.
+
+6. **Notification Service:**
+
+   * Asynchronous email notifications via Kafka messaging.
+
+7. **Rating System:**
+
+   * Calculation and asynchronous updating of average property ratings.
+
+8. **Service Discovery:**
+
+   * Eureka-based service registry for load balancing and service discovery.
+
+9. **API Documentation:**
+
+   * Comprehensive and interactive API documentation via Swagger.
+
+10. **Containerization:**
+
+    * Fully Dockerized services and infrastructure for simplified deployment.
+
+---
 
 ## Technologies Used
 
-- **Java**: The main programming language used for implementing backend services.
-- **Spring Framework**: Used for building the microservices, including Spring Boot, Spring Security, and Spring Data JPA.
-- **PostgreSQL**: Relational database for storing user, property, and booking data.
-- **Spring Cloud**: Used for managing microservices and communication between them.
-- **JWT**: For secure user authentication and authorization.
-- **Maven**: Build automation tool for Java projects.
+* **Programming Language:** Java
+* **Frameworks and Tools:** Spring Boot, Spring Security, Spring Data JPA, Spring Cloud, OpenFeign
+* **Database:** PostgreSQL
+* **Messaging:** Kafka
+* **Containerization:** Docker
+* **Documentation:** Swagger (OpenAPI)
+* **Others:** Lombok, Maven, Eureka
+
+---
+
+## Modules
+
+1. **User Service:**
+
+   * Handles registration, authentication, and user profile management.
+
+2. **Property Service:**
+
+   * Manages detailed property listings and property features.
+
+3. **Booking Service:**
+
+   * Manages bookings with real-time availability and status updates.
+   * Communicates via Kafka with the notification service.
+
+4. **Review Service:**
+
+   * Manages property reviews, verifying authenticity through booking data.
+   * Updates property ratings asynchronously.
+
+5. **Notification Service:**
+
+   * Sends asynchronous email notifications based on booking events.
+
+6. **API Gateway:**
+
+   * Unified entry point for secured API requests.
+
+7. **Discovery Server:**
+
+   * Central registry for microservice communication and discovery.
+
+---
+
+## Prerequisites
+
+* Java 21+ installed
+* Maven installed
+* Docker and Docker Compose installed
+* PostgreSQL (optional for manual verification)
+
+---
 
 ## Installation Guide
 
-Follow these steps to set up the project on your local machine.
-
-1. **Clone the repository**:
+1. **Clone the Repository:**
 
    ```bash
    git clone https://github.com/9jer/booking-app.git
-   cd your-repository
+   cd booking-app
    ```
 
-2. **Install dependencies**:
-
-   Ensure that you have Java 11 or later installed. Then, run the following command to install dependencies using Maven:
+2. **Build the Project:**
 
    ```bash
-   mvn install
+   mvn clean install
    ```
 
-3. **Set up PostgreSQL**:
+3. **Set Up Database:**
 
-   - Create a PostgreSQL database and configure the database connection in the `application.properties` file.
-   - Example database configuration:
+   Configure PostgreSQL in `application.properties`:
 
-     ```properties
-     spring.datasource.url=jdbc:postgresql://localhost:5432/yourdbname
-     spring.datasource.username=yourusername
-     spring.datasource.password=yourpassword
-     ```
+   ```properties
+   spring.datasource.url=jdbc:postgresql://localhost:5432/yourdbname
+   spring.datasource.username=yourusername
+   spring.datasource.password=yourpassword
+   ```
 
-4. **Start the application**:
-
-   You can run the application with the following command:
+4. **Run with Docker:**
 
    ```bash
-   mvn spring-boot:run
+   docker-compose up --build
    ```
+
+---
 
 ## Usage Instructions
 
-1. **Access the Application**:
+### Accessing Services:
 
-   Once the services are up and running, you can access the platform through your browser. The API is available at `http://localhost:8080`, and each service can be accessed individually based on its configuration (e.g., user service, booking service, etc.).
+* **API Gateway:** `http://localhost:8080`
+* **Swagger Documentation:** `http://localhost:8080/swagger-ui.html`
 
-2. **Testing the Application**:
+### Key Endpoints(Examples):
 
-   The project includes integration tests for each service. You can run tests using Maven:
+| Method | Endpoint                       | Access        | Description                      |
+| ------ | ------------------------------ | ------------- | -------------------------------- |
+| POST   | `/api/v1/auth/sign-up`         | Public        | User registration                |
+| POST   | `/api/v1/auth/sign-in`         | Public        | User login (JWT token retrieval) |
+| GET    | `/api/v1/properties`           | Public        | Retrieve properties              |
+| POST   | `/api/v1/bookings`             | Authenticated | Create booking                   |
+| PATCH  | `/api/v1/bookings/{id}/status` | Authenticated | Update booking status            |
 
-   ```bash
-   mvn test
-   ```
+Include JWT in headers for secured endpoints:
 
-3. **API Endpoints**:
+```http
+Authorization: Bearer <your_jwt_token>
+```
 
-   - **POST** `/api/v1/auth/sign-up`: Register a new user
-   - **POST** `/api/v1/sign-in`: Login and receive a JWT token
-   - **GET** `/api/v1/properties`: Get available properties
-   - **POST** `/api/v1/bookings`: Create a new booking
-   - **GET** `/api/v1/reviews`: Get reviews for a property
+---
 
-   Make sure to include a valid JWT token in the headers when making requests to protected endpoints.
+## Testing
+
+* **Unit and Integration Tests:**
+
+  ```bash
+  mvn test
+  ```
+
+* **Postman Collection:**  A Postman collection with all API endpoints is available [here](https://drive.google.com/file/d/11Fq5EUYMW6_s6hbG9hfi_DXSf28A1T5O/view?usp=sharing).
+
+---
 
 ## Contact
 
-- Email: vladimir.stxsevich@gmail.com
+* Email: [vladimir.stxsevich@gmail.com](mailto:vladimir.stxsevich@gmail.com)
