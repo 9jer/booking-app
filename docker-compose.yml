@@ -1,7 +1,62 @@
 services:
+  discovery-server:
+    image: 90jer/discovery-server:latest
+    #container_name: discovery-server
+    pull_policy: always
+    ports:
+      - "8761:8761"
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+    volumes:
+      - ./discovery-server/src/main/resources/application-docker.yml:/application-docker.yml
+
+  api-gateway:
+    image: 90jer/api-gateway:latest
+    #container_name: api-gateway
+    pull_policy: always
+    ports:
+      - "8080:8080"
+    depends_on:
+      - discovery-server
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_SECURITY=TRACE
+    volumes:
+      - ./api-gateway/src/main/resources/application-docker.yml:/application-docker.yml
+
+  notification-service:
+    image: 90jer/notification-service:latest
+    #container_name: notification-service
+    pull_policy: always
+    ports:
+      - "8085:8085"
+    depends_on:
+      - discovery-server
+      - kafka
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+    volumes:
+      - ./notification-service/src/main/resources/application-docker.yml:/application-docker.yml
+
+  booking-service:
+    image: 90jer/booking-service:latest
+    #container_name: booking-service
+    pull_policy: always
+    ports:
+      - "8082:8082"
+    depends_on:
+      - discovery-server
+      - postgres-booking
+      - api-gateway
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres-booking:5432/booking_service_db
+    volumes:
+      - ./booking-service/src/main/resources/application-docker.yml:/application-docker.yml
+
   postgres-booking:
     image: postgres:latest
-    container_name: postgres-booking
+    #container_name: postgres-booking
     environment:
       POSTGRES_DB: booking_service_db
       POSTGRES_USER: postgres
@@ -12,9 +67,25 @@ services:
       - pg_booking:/var/lib/postgresql/data
     restart: unless-stopped
 
+  property-service:
+    image: 90jer/property-service:latest
+    #container_name: property-service
+    pull_policy: always
+    ports:
+      - "8081:8081"
+    depends_on:
+      - discovery-server
+      - postgres-property
+      - api-gateway
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres-property:5432/property_service_db
+    volumes:
+      - ./property-service/src/main/resources/application-docker.yml:/application-docker.yml
+
   postgres-property:
     image: postgres:latest
-    container_name: postgres-property
+    #container_name: postgres-property
     environment:
       POSTGRES_DB: property_service_db
       POSTGRES_USER: postgres
@@ -25,9 +96,25 @@ services:
       - pg_property:/var/lib/postgresql/data
     restart: unless-stopped
 
+  review-service:
+    image: 90jer/review-service:latest
+    #container_name: review-service
+    pull_policy: always
+    ports:
+      - "8083:8083"
+    depends_on:
+      - discovery-server
+      - postgres-review
+      - api-gateway
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres-review:5432/review_service_db
+    volumes:
+      - ./review-service/src/main/resources/application-docker.yml:/application-docker.yml
+
   postgres-review:
     image: postgres:latest
-    container_name: postgres-review
+    #container_name: postgres-review
     environment:
       POSTGRES_DB: review_service_db
       POSTGRES_USER: postgres
@@ -38,9 +125,25 @@ services:
       - pg_review:/var/lib/postgresql/data
     restart: unless-stopped
 
+  user-service:
+    image: 90jer/user-service:latest
+    #container_name: user-service
+    pull_policy: always
+    ports:
+      - "8084:8084"
+    depends_on:
+      - discovery-server
+      - postgres-user
+      - api-gateway
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres-user:5432/user_service_db
+    volumes:
+      - ./user-service/src/main/resources/application-docker.yml:/application-docker.yml
+
   postgres-user:
     image: postgres:latest
-    container_name: postgres-user
+    #container_name: postgres-user
     environment:
       POSTGRES_DB: user_service_db
       POSTGRES_USER: postgres
@@ -53,7 +156,7 @@ services:
 
   zookeeper:
     image: confluentinc/cp-zookeeper:latest
-    container_name: zookeeper
+    #container_name: zookeeper
     hostname: zookeeper
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
@@ -63,7 +166,7 @@ services:
 
   kafka:
     image: confluentinc/cp-kafka:latest
-    container_name: kafka
+    #container_name: kafka
     hostname: kafka
     depends_on:
       - zookeeper
@@ -83,7 +186,7 @@ services:
   schema-registry:
     image: confluentinc/cp-schema-registry:latest
     hostname: schema-registry
-    container_name: schema-registry
+    #container_name: schema-registry
     depends_on:
       - kafka
     ports:
@@ -95,7 +198,7 @@ services:
 
   kafka-ui:
     image: provectuslabs/kafka-ui:latest
-    container_name: kafka-ui
+    #container_name: kafka-ui
     ports:
       - 8090:8080
     restart: always
