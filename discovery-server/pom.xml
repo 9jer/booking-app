@@ -13,9 +13,6 @@
     <name>discovery-server</name>
     <url>http://maven.apache.org</url>
 
-    <properties>
-    </properties>
-
     <dependencies>
         <dependency>
             <groupId>org.springframework.cloud</groupId>
