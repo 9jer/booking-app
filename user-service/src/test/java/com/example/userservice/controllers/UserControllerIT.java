@@ -10,6 +10,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
+import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -45,6 +46,9 @@ class UserControllerIT {
 
     @MockBean
     private JwtTokenUtils jwtTokenUtils;
+
+    @MockBean
+    private ModelMapper modelMapper;
 
     private User testUser;
     private UserDTO testUserDTO;
@@ -84,23 +88,25 @@ class UserControllerIT {
     @Test
     void getAllUsers_ShouldReturnListOfUsers() throws Exception {
         Mockito.when(userService.findAll()).thenReturn(List.of(testUser));
+        Mockito.when(modelMapper.map(testUser, UserDTO.class)).thenReturn(testUserDTO);
 
         mockMvc.perform(get(USERS_ROOT_ENDPOINT)
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.users[0].id").value(testUser.getId()))
-                .andExpect(jsonPath("$.users[0].username").value(testUser.getUsername()));
+                .andExpect(jsonPath("$.users[0].id").value(testUserDTO.getId()))
+                .andExpect(jsonPath("$.users[0].username").value(testUserDTO.getUsername()));
     }
 
     @Test
     void getUserById_ShouldReturnUser() throws Exception {
         Mockito.when(userService.getUserById(anyLong())).thenReturn(testUser);
+        Mockito.when(modelMapper.map(testUser, UserDTO.class)).thenReturn(testUserDTO);
 
         mockMvc.perform(get(USERS_ID_ENDPOINT, 1L)
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id").value(testUser.getId()))
-                .andExpect(jsonPath("$.username").value(testUser.getUsername()));
+                .andExpect(jsonPath("$.id").value(testUserDTO.getId()))
+                .andExpect(jsonPath("$.username").value(testUserDTO.getUsername()));
     }
 
     @Test
@@ -118,12 +124,13 @@ class UserControllerIT {
     void updateUser_WithValidData_ShouldReturnUpdatedUser() throws Exception {
         Mockito.when(userService.updateUserById(anyLong(), any(SaveUserDTO.class)))
                 .thenReturn(testUser);
+        Mockito.when(modelMapper.map(testUser, UserDTO.class)).thenReturn(testUserDTO);
 
         mockMvc.perform(patch(USERS_ID_ENDPOINT, 1L)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(testSaveUserDTO)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id").value(testUser.getId()));
+                .andExpect(jsonPath("$.id").value(testUserDTO.getId()));
     }
 
     @Test
@@ -146,11 +153,12 @@ class UserControllerIT {
     @Test
     void assignOwnerRole_ShouldReturnUpdatedUser() throws Exception {
         Mockito.when(userService.assignOwnerRole(anyLong())).thenReturn(testUser);
+        Mockito.when(modelMapper.map(testUser, UserDTO.class)).thenReturn(testUserDTO);
 
         mockMvc.perform(post(ASSIGN_OWNER_ENDPOINT, 1L)
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id").value(testUser.getId()));
+                .andExpect(jsonPath("$.id").value(testUserDTO.getId()));
     }
 
     @Test

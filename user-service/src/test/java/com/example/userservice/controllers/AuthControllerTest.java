@@ -3,10 +3,9 @@ package com.example.userservice.controllers;
 import com.example.userservice.dto.JwtRequest;
 import com.example.userservice.dto.JwtResponse;
 import com.example.userservice.dto.SaveUserDTO;
+import com.example.userservice.dto.UserDTO;
 import com.example.userservice.models.User;
 import com.example.userservice.services.AuthService;
-import com.example.userservice.util.AuthException;
-import com.example.userservice.util.ErrorResponse;
 import com.example.userservice.util.UserException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -14,6 +13,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.modelmapper.ModelMapper;
 import org.slf4j.Logger;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -36,6 +36,9 @@ class AuthControllerTest {
     @Mock
     private Logger logger;
 
+    @Mock
+    private ModelMapper modelMapper;
+
     @InjectMocks
     private AuthController authController;
 
@@ -43,6 +46,7 @@ class AuthControllerTest {
     private SaveUserDTO saveUserDTO;
     private JwtResponse jwtResponse;
     private User user;
+    private UserDTO userDTO;
 
     @BeforeEach
     void setUp() {
@@ -64,6 +68,11 @@ class AuthControllerTest {
         user.setId(1L);
         user.setUsername("testuser");
         user.setEmail("test@example.com");
+
+        userDTO = new UserDTO();
+        userDTO.setId(1L);
+        userDTO.setUsername("testuser");
+        userDTO.setEmail("test@example.com");
     }
 
     @Test
@@ -104,6 +113,7 @@ class AuthControllerTest {
         // Given
         when(bindingResult.hasErrors()).thenReturn(false);
         when(authService.createNewUser(any(SaveUserDTO.class))).thenReturn(user);
+        when(modelMapper.map(user, UserDTO.class)).thenReturn(userDTO);
 
         // When
         ResponseEntity<?> response = authController.createNewUser(saveUserDTO, bindingResult);
@@ -112,7 +122,7 @@ class AuthControllerTest {
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertEquals(MediaType.APPLICATION_JSON, response.getHeaders().getContentType());
         assertNotNull(response.getBody());
-        assertEquals(user, response.getBody());
+        assertEquals(userDTO, response.getBody());
 
         verify(authService, times(1)).createNewUser(any(SaveUserDTO.class));
     }
