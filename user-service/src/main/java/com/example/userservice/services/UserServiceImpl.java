@@ -6,42 +6,75 @@ import com.example.userservice.models.User;
 import com.example.userservice.repositories.UserRepository;
 import com.example.userservice.util.ErrorsUtil;
 import com.example.userservice.util.UserException;
-import lombok.RequiredArgsConstructor;
 import org.modelmapper.ModelMapper;
+import org.springframework.cache.Cache;
+import org.springframework.cache.CacheManager;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.CachePut;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.Caching;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 
-@Service
-@RequiredArgsConstructor
+@Service("userServiceImpl")
 @Transactional(readOnly = true)
 public class UserServiceImpl implements UserService {
     private final UserRepository userRepository;
     private final RoleService roleService;
     private final PasswordEncoder passwordEncoder;
     private final ModelMapper modelMapper;
+    private final CacheManager cacheManager;
 
-    @Override
-    public Optional<User> findByUsername(String username) {
-        return userRepository.findByUsername(username);
+    private final UserService self;
+
+    public UserServiceImpl(@Lazy UserService self, UserRepository userRepository, RoleService roleService,
+                           PasswordEncoder passwordEncoder, ModelMapper modelMapper, CacheManager cacheManager) {
+        this.self = self;
+        this.userRepository = userRepository;
+        this.roleService = roleService;
+        this.passwordEncoder = passwordEncoder;
+        this.modelMapper = modelMapper;
+        this.cacheManager = cacheManager;
     }
 
     @Override
+    @Cacheable(value = "userByUsername", key = "#username", unless = "#result == null")
+    public Optional<User> findByUsername(String username) {
+        Optional<User> userOptional = userRepository.findByUsername(username);
+        return userOptional.map(this::convertToDetachedUser);
+    }
+
+    @Override
+    @Cacheable(value = "userByEmail", key = "#email", unless = "#result == null")
     public Optional<User> findByEmail(String email) {
-        return userRepository.findByEmail(email);
+        Optional<User> userOptional = userRepository.findByEmail(email);
+        return userOptional.map(this::convertToDetachedUser);
     }
 
     @Override
     @Transactional
+    @Caching(
+            put = {
+                    @CachePut(value = "userById", key = "#result.id"),
+                    @CachePut(value = "userByUsername", key = "#result.username")
+            },
+            evict = {
+                    @CacheEvict(value = "userByEmail", key = "#result.email")
+            })
     public User createNewUser(User user) {
         user.setPassword(passwordEncoder.encode(user.getPassword()));
         user.setRoles(List.of(roleService.getGuestRole()));
         user.setCreatedAt(LocalDateTime.now());
-        return userRepository.save(user);
+        User savedUser = userRepository.save(user);
+        return convertToDetachedUser(savedUser);
     }
 
     @Override
@@ -50,27 +83,41 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
+    @Cacheable(value = "userById", key = "#id")
     public User getUserById(Long id) {
-        return userRepository.findById(id).orElseThrow(()->
+        User user = userRepository.findById(id).orElseThrow(() ->
                 new UserException(String.format("User %s not found", id)));
+        return convertToDetachedUser(user);
     }
 
     @Override
     @Transactional
+    @CachePut(value = "userById", key = "#id")
     public User updateUserById(Long id, SaveUserDTO updatedUser) {
+        Optional<User> userByUsername = self.findByUsername(updatedUser.getUsername());
+        Optional<User> userByEmail = self.findByEmail(updatedUser.getEmail());
 
-        ErrorsUtil.validateInputUserData(updatedUser, userRepository.findByUsername(updatedUser.getUsername())
-                ,userRepository.findByEmail(updatedUser.getEmail())
-        );
+        if(userByUsername.isPresent() && userByUsername.get().getId().equals(id)) {
+            userByUsername = Optional.empty();
+        }
 
-        User exsitingUser = getUserById(id);
+        if(userByEmail.isPresent() && userByEmail.get().getId().equals(id)) {
+            userByEmail = Optional.empty();
+        }
+
+        ErrorsUtil.validateInputUserData(updatedUser, userByUsername, userByEmail);
+
+        User existingUser = userRepository.findById(id).orElseThrow(() ->
+                new UserException(String.format("User %s not found", id)));
+
+        evictUserCaches(existingUser);
 
         User user = convertUserDTOToUser(updatedUser);
-        enrichPropertyForUpdate(exsitingUser, user);
-        
-        return userRepository.save(exsitingUser);
-    }
+        enrichPropertyForUpdate(existingUser, user);
 
+        User savedUser = userRepository.save(existingUser);
+        return convertToDetachedUser(savedUser);
+    }
 
     private User convertUserDTOToUser(SaveUserDTO saveUserDTO){
         return modelMapper.map(saveUserDTO, User.class);
@@ -87,11 +134,18 @@ public class UserServiceImpl implements UserService {
 
     @Override
     @Transactional
+    @CachePut(value = "userById", key = "#userId")
     public User assignOwnerRole(Long userId) {
-        User user = getUserById(userId);
+        User user = userRepository.findById(userId).orElseThrow(() ->
+                new RuntimeException("User not found"));
+
+        evictUserCaches(user);
+
         Role ownerRole = roleService.getOwnerRole();
         user.getRoles().add(ownerRole);
-        return userRepository.save(user);
+
+        User savedUser = userRepository.save(user);
+        return convertToDetachedUser(savedUser);
     }
 
     @Override
@@ -102,6 +156,46 @@ public class UserServiceImpl implements UserService {
     @Override
     @Transactional
     public void deleteUserById(Long id) {
-        userRepository.deleteById(id);
+        User user = userRepository.findById(id).orElseThrow(() -> new UserException("User not found"));
+
+        evictUserCaches(user);
+        Objects.requireNonNull(cacheManager.getCache("userById")).evict(id);
+
+        userRepository.delete(user);
+    }
+
+    private void evictUserCaches(User user) {
+        if (user.getUsername() != null) {
+            Cache usernameCache = cacheManager.getCache("userByUsername");
+            if (usernameCache != null) {
+                usernameCache.evict(user.getUsername());
+            }
+        }
+        if (user.getEmail() != null) {
+            Cache emailCache = cacheManager.getCache("userByEmail");
+            if (emailCache != null) {
+                emailCache.evict(user.getEmail());
+            }
+        }
+    }
+
+    private User convertToDetachedUser(User user) {
+        User detachedUser = new User();
+        detachedUser.setId(user.getId());
+        detachedUser.setUsername(user.getUsername());
+        detachedUser.setEmail(user.getEmail());
+        detachedUser.setName(user.getName());
+        detachedUser.setPhone(user.getPhone());
+        detachedUser.setPassword(user.getPassword());
+        detachedUser.setCreatedAt(user.getCreatedAt());
+        detachedUser.setUpdatedAt(user.getUpdatedAt());
+
+        if (user.getRoles() != null) {
+            detachedUser.setRoles(new ArrayList<>(user.getRoles()));
+        } else {
+            detachedUser.setRoles(new ArrayList<>());
+        }
+
+        return detachedUser;
     }
 }
