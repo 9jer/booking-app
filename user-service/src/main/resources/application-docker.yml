@@ -6,6 +6,12 @@ spring:
     url: jdbc:postgresql://postgres-user:5432/user_service_db
     username: postgres
     password: postgres
+  data:
+    redis:
+      host: redis
+      port: 6379
+  cache:
+    type: redis
 
 eureka:
   client:

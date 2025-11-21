@@ -12,6 +12,8 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.modelmapper.ModelMapper;
+import org.springframework.cache.Cache;
+import org.springframework.cache.CacheManager;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -37,6 +39,15 @@ class UserServiceImplTest {
     @Mock
     private ModelMapper modelMapper;
 
+    @Mock
+    private CacheManager cacheManager;
+
+    @Mock
+    private Cache cache;
+
+    @Mock
+    private UserService self;
+
     @InjectMocks
     private UserServiceImpl userService;
 
@@ -55,6 +66,7 @@ class UserServiceImplTest {
         user.setName("Test User");
         user.setPhone("1234567890");
         user.setCreatedAt(LocalDateTime.now());
+        user.setRoles(new ArrayList<>());
 
         saveUserDTO = new SaveUserDTO();
         saveUserDTO.setUsername("testuser");
@@ -83,7 +95,7 @@ class UserServiceImplTest {
 
         // Then
         assertTrue(result.isPresent());
-        assertEquals(user, result.get());
+        assertEquals(user.getUsername(), result.get().getUsername());
         verify(userRepository, times(1)).findByUsername("testuser");
     }
 
@@ -97,7 +109,7 @@ class UserServiceImplTest {
 
         // Then
         assertTrue(result.isPresent());
-        assertEquals(user, result.get());
+        assertEquals(user.getEmail(), result.get().getEmail());
         verify(userRepository, times(1)).findByEmail("test@example.com");
     }
 
@@ -114,6 +126,7 @@ class UserServiceImplTest {
         when(userRepository.save(any(User.class))).thenAnswer(invocation -> {
             User saved = invocation.getArgument(0);
             saved.setId(2L);
+            saved.setRoles(new ArrayList<>(List.of(guestRole)));
             return saved;
         });
 
@@ -123,7 +136,7 @@ class UserServiceImplTest {
         // Then
         assertNotNull(result.getId());
         assertEquals("encodedPassword", result.getPassword());
-        assertTrue(result.getRoles().contains(guestRole));
+        assertTrue(result.getRoles().stream().anyMatch(r -> r.getName().equals("ROLE_GUEST")));
         assertNotNull(result.getCreatedAt());
         verify(userRepository, times(1)).save(newUser);
     }
@@ -151,7 +164,7 @@ class UserServiceImplTest {
         User result = userService.getUserById(1L);
 
         // Then
-        assertEquals(user, result);
+        assertEquals(user.getId(), result.getId());
         verify(userRepository, times(1)).findById(1L);
     }
 
@@ -181,14 +194,16 @@ class UserServiceImplTest {
         User existingUser = new User();
         existingUser.setId(1L);
         existingUser.setUsername("olduser");
+        existingUser.setRoles(new ArrayList<>());
 
         User updatedUser = new User();
         updatedUser.setUsername("newuser");
         updatedUser.setPassword("newpassword");
 
+        when(cacheManager.getCache(anyString())).thenReturn(cache);
         when(userRepository.findById(1L)).thenReturn(Optional.of(existingUser));
-        when(userRepository.findByUsername("newuser")).thenReturn(Optional.empty());
-        when(userRepository.findByEmail("new@example.com")).thenReturn(Optional.empty());
+        when(self.findByUsername("newuser")).thenReturn(Optional.empty());
+        when(self.findByEmail("new@example.com")).thenReturn(Optional.empty());
         when(modelMapper.map(updatedDto, User.class)).thenReturn(updatedUser);
         when(passwordEncoder.encode("newpassword")).thenReturn("encodedNewPass");
         when(userRepository.save(existingUser)).thenReturn(existingUser);
@@ -200,8 +215,6 @@ class UserServiceImplTest {
         assertNotNull(result.getUpdatedAt());
         verify(userRepository).save(existingUser);
     }
-
-
 
     @Test
     @Transactional
@@ -241,12 +254,14 @@ class UserServiceImplTest {
     @Transactional
     void deleteUserById_ValidId_DeletesUser() {
         // Given
-        doNothing().when(userRepository).deleteById(1L);
+        when(cacheManager.getCache(anyString())).thenReturn(cache);
+        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+        doNothing().when(userRepository).delete(user);
 
         // When
         userService.deleteUserById(1L);
 
         // Then
-        verify(userRepository, times(1)).deleteById(1L);
+        verify(userRepository, times(1)).delete(user);
     }
 }

@@ -6,6 +6,8 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import java.util.List;
+
 @Setter
 @Getter
 @AllArgsConstructor
@@ -25,4 +27,6 @@ public class UserDTO {
 
     @NotEmpty(message = "Phone should not be empty!")
     private String phone;
+
+    private List<String> roles;
 }

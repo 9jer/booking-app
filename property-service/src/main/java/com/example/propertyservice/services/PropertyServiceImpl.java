@@ -8,20 +8,22 @@ import com.example.propertyservice.repositories.PropertyFeatureRepository;
 import com.example.propertyservice.repositories.PropertyRepository;
 import com.example.propertyservice.util.JwtTokenUtils;
 import com.example.propertyservice.util.PropertyException;
-import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.CachePut;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-@Service
+@Service("propertyServiceImpl")
 @Transactional(readOnly = true)
-@RequiredArgsConstructor
 public class PropertyServiceImpl implements PropertyService {
     private final PropertyRepository propertyRepository;
     private final PropertyFeatureRepository propertyFeatureRepository;
@@ -29,19 +31,34 @@ public class PropertyServiceImpl implements PropertyService {
     private final UserClient userClient;
     private final JwtTokenUtils jwtTokenUtils;
 
+    public PropertyServiceImpl(PropertyRepository propertyRepository,
+                               PropertyFeatureRepository propertyFeatureRepository,
+                               BookingClient bookingClient,
+                               UserClient userClient,
+                               JwtTokenUtils jwtTokenUtils) {
+        this.propertyRepository = propertyRepository;
+        this.propertyFeatureRepository = propertyFeatureRepository;
+        this.bookingClient = bookingClient;
+        this.userClient = userClient;
+        this.jwtTokenUtils = jwtTokenUtils;
+    }
+
     @Override
     public List<Property> findAll(){
         return propertyRepository.findAll();
     }
 
     @Override
+    @Cacheable(value = "property", key = "#id")
     public Property getPropertyById(Long id){
-        return propertyRepository.findById(id).orElseThrow(()->
+        Property property = propertyRepository.findById(id).orElseThrow(()->
                 new PropertyException("Property not found"));
+        return convertToDetachedProperty(property);
     }
 
     @Override
     @Transactional
+    @CachePut(value = "property", key = "#result.id")
     public Property save(Property property, String token) {
         property.setOwnerId(jwtTokenUtils.getUserId(token));
 
@@ -54,7 +71,8 @@ public class PropertyServiceImpl implements PropertyService {
 
         enrichPropertyForSave(property);
         property.setId(null);
-        return propertyRepository.save(property);
+        Property savedProperty = propertyRepository.save(property);
+        return convertToDetachedProperty(savedProperty);
     }
 
     private void enrichPropertyForSave(Property property) {
@@ -64,8 +82,10 @@ public class PropertyServiceImpl implements PropertyService {
 
     @Override
     @Transactional
+    @CachePut(value = "property", key = "#id")
     public Property updatePropertyById(Long id, Property updatedProperty, String token) {
-        Property existingProperty = getPropertyById(id);
+        Property existingProperty = propertyRepository.findById(id).orElseThrow(()->
+                new PropertyException("Property not found"));
 
         updatedProperty.setOwnerId(jwtTokenUtils.getUserId(token));
 
@@ -78,11 +98,11 @@ public class PropertyServiceImpl implements PropertyService {
 
         enrichPropertyForUpdate(existingProperty, updatedProperty);
 
-        return propertyRepository.save(existingProperty);
+        Property savedProperty = propertyRepository.save(existingProperty);
+        return convertToDetachedProperty(savedProperty);
     }
 
     private void enrichPropertyForUpdate(Property existingProperty, Property updatedProperty) {
-        // Обновить основные поля
         existingProperty.setOwnerId(updatedProperty.getOwnerId());
         existingProperty.setTitle(updatedProperty.getTitle());
         existingProperty.setDescription(updatedProperty.getDescription());
@@ -105,7 +125,7 @@ public class PropertyServiceImpl implements PropertyService {
 
     @Override
     public List<LocalDate> getAvailableDates(Long propertyId) {
-        return bookingClient.getAvailableDates(propertyId);
+        return bookingClient.getAvailableDates(propertyId).getAvailableDates();
     }
 
     @Override
@@ -121,10 +141,13 @@ public class PropertyServiceImpl implements PropertyService {
     }
 
     @Transactional
-    public void updateAverageRating(Long propertyId, Double averageRating, Long totalReviews) {
-        var property = getPropertyById(propertyId);
+    @CachePut(value = "property", key = "#propertyId")
+    public Property updateAverageRating(Long propertyId, Double averageRating, Long totalReviews) {
+        var property = propertyRepository.findById(propertyId).orElseThrow(()->
+                new PropertyException("Property not found"));
         property.setAverageRating(BigDecimal.valueOf(averageRating));
-        propertyRepository.save(property);
+        Property savedProperty = propertyRepository.save(property);
+        return convertToDetachedProperty(savedProperty);
     }
 
     @Override
@@ -134,7 +157,32 @@ public class PropertyServiceImpl implements PropertyService {
 
     @Override
     @Transactional
+    @CacheEvict(value = "property", key = "#id")
     public void delete(Long id) {
-        propertyRepository.deleteById(id);
+        Property property = propertyRepository.findById(id).orElseThrow(()->
+                new PropertyException("Property not found"));
+        propertyRepository.delete(property);
+    }
+
+    private Property convertToDetachedProperty(Property property) {
+        Property detachedProperty = new Property();
+        detachedProperty.setId(property.getId());
+        detachedProperty.setOwnerId(property.getOwnerId());
+        detachedProperty.setTitle(property.getTitle());
+        detachedProperty.setDescription(property.getDescription());
+        detachedProperty.setLocation(property.getLocation());
+        detachedProperty.setPricePerNight(property.getPricePerNight());
+        detachedProperty.setCapacity(property.getCapacity());
+        detachedProperty.setAverageRating(property.getAverageRating());
+        detachedProperty.setCreatedAt(property.getCreatedAt());
+        detachedProperty.setUpdatedAt(property.getUpdatedAt());
+
+        if (property.getFeatures() != null) {
+            detachedProperty.setFeatures(new HashSet<>(property.getFeatures()));
+        } else {
+            detachedProperty.setFeatures(new HashSet<>());
+        }
+
+        return detachedProperty;
     }
 }

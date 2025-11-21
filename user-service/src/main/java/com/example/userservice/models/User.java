@@ -40,7 +40,7 @@ public class User {
     @NotEmpty(message = "Phone should not be empty!")
     private String phone;
 
-    @ManyToMany
+    @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(
             name = "users_roles",
             joinColumns = @JoinColumn(name = "user_id"),

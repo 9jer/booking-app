@@ -2,6 +2,7 @@ package com.example.propertyservice.services;
 
 import com.example.propertyservice.client.BookingClient;
 import com.example.propertyservice.client.UserClient;
+import com.example.propertyservice.dto.AvailableDatesResponse;
 import com.example.propertyservice.models.Property;
 import com.example.propertyservice.models.PropertyFeature;
 import com.example.propertyservice.repositories.PropertyFeatureRepository;
@@ -60,6 +61,7 @@ class PropertyServiceImplTest {
         property.setPricePerNight(BigDecimal.valueOf(100));
         property.setCapacity(4);
         property.setCreatedAt(LocalDateTime.now());
+        property.setFeatures(new HashSet<>());
 
         feature = new PropertyFeature();
         feature.setId(1L);
@@ -89,7 +91,8 @@ class PropertyServiceImplTest {
         Property result = propertyService.getPropertyById(1L);
 
         // Then
-        assertEquals(property, result);
+        assertNotNull(result);
+        assertEquals(property.getId(), result.getId());
         verify(propertyRepository, times(1)).findById(1L);
     }
 
@@ -155,6 +158,7 @@ class PropertyServiceImplTest {
 
         Property existingProperty = new Property();
         existingProperty.setId(1L);
+        existingProperty.setOwnerId(1L);
         existingProperty.setFeatures(new HashSet<>());
 
         Property updatedProperty = new Property();
@@ -163,6 +167,7 @@ class PropertyServiceImplTest {
         updatedProperty.setFeatures(Set.of(feature));
 
         when(propertyRepository.findById(1L)).thenReturn(Optional.of(existingProperty));
+
         when(jwtTokenUtils.getUserId(token)).thenReturn(1L);
         when(userClient.userExists(1L)).thenReturn(true);
         when(propertyRepository.save(any(Property.class))).thenReturn(existingProperty);
@@ -173,11 +178,12 @@ class PropertyServiceImplTest {
 
         // Then
         assertNotNull(result);
-        assertEquals("Updated Title", result.getTitle());
-        assertEquals("Updated Description", result.getDescription());
-        assertNotNull(result.getUpdatedAt());
-        assertNotNull(result.getFeatures());
-        assertEquals(1, result.getFeatures().size());
+        assertEquals("Updated Title", existingProperty.getTitle());
+        assertEquals("Updated Description", existingProperty.getDescription());
+        assertNotNull(existingProperty.getUpdatedAt());
+        assertNotNull(existingProperty.getFeatures());
+        assertEquals(1, existingProperty.getFeatures().size());
+
         verify(propertyRepository, times(1)).save(existingProperty);
         verify(propertyFeatureRepository, atLeastOnce()).findByName(anyString());
     }
@@ -201,7 +207,8 @@ class PropertyServiceImplTest {
     void getAvailableDates_ReturnsBookingClientResult() {
         // Given
         List<LocalDate> dates = List.of(LocalDate.now().plusDays(1), LocalDate.now().plusDays(2));
-        when(bookingClient.getAvailableDates(1L)).thenReturn(dates);
+        AvailableDatesResponse response = new AvailableDatesResponse(dates);
+        when(bookingClient.getAvailableDates(1L)).thenReturn(response);
 
         // When
         List<LocalDate> result = propertyService.getAvailableDates(1L);
@@ -262,13 +269,14 @@ class PropertyServiceImplTest {
     @Transactional
     void delete_DeletesProperty() {
         // Given
-        doNothing().when(propertyRepository).deleteById(1L);
+        when(propertyRepository.findById(1L)).thenReturn(Optional.of(property));
+        doNothing().when(propertyRepository).delete(property);
 
         // When
         propertyService.delete(1L);
 
         // Then
-        verify(propertyRepository, times(1)).deleteById(1L);
+        verify(propertyRepository, times(1)).delete(property);
     }
 
 }

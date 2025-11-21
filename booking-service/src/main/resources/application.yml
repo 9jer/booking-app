@@ -1,27 +1,33 @@
 spring:
   application:
     name: booking-service
-
   config:
     import: optional:classpath:secrets.properties
-
   datasource:
     driver-class-name: org.postgresql.Driver
     url: jdbc:postgresql://localhost:5433/booking_service_db
     username: postgres
     password: postgres
-
   jpa:
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
         show_sql: true
-
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+    deserialization:
+      fail-on-unknown-properties: false
+  data:
+    redis:
+      host: localhost
+      port: 6379
+  cache:
+    type: redis
   mvc:
     hiddenmethod:
       filter:
         enabled: true
-
   kafka:
     bootstrap-servers: localhost:9092
     template:
@@ -67,6 +73,3 @@ feign-client:
     property-exists: /api/v1/properties/{id}/exists
     user-exists: api/v1/users/{id}/exists
     get-property-by-id: /api/v1/properties/{id}
-
-
-

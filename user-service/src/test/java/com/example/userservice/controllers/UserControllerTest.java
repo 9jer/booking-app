@@ -21,7 +21,6 @@ import org.springframework.validation.BindingResult;
 
 import java.security.Principal;
 import java.util.Collections;
-import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -132,30 +131,30 @@ class UserControllerTest {
         // Given
         when(bindingResult.hasErrors()).thenReturn(false);
         when(userService.updateUserById(anyLong(), any(SaveUserDTO.class))).thenReturn(user);
+        when(modelMapper.map(any(User.class), eq(UserDTO.class))).thenReturn(userDTO);
 
         // When
-        ResponseEntity<User> response = userController.updateUser(1L, saveUserDTO, bindingResult);
+        ResponseEntity<UserDTO> response = userController.updateUser(1L, saveUserDTO, bindingResult);
 
         // Then
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertEquals(MediaType.APPLICATION_JSON, response.getHeaders().getContentType());
         assertNotNull(response.getBody());
-        assertEquals(user, response.getBody());
+        assertEquals(userDTO, response.getBody());
 
         verify(userService, times(1)).updateUserById(1L, saveUserDTO);
+        verify(modelMapper, times(1)).map(any(User.class), eq(UserDTO.class));
     }
 
     @Test
     void updateUser_InvalidRequest_ThrowsUserException() {
         // Given
         when(bindingResult.hasErrors()).thenReturn(true);
-        //doThrow(new UserException("Validation error")).when(bindingResult).getAllErrors();
 
         // When & Then
-        UserException exception = assertThrows(UserException.class,
+        assertThrows(UserException.class,
                 () -> userController.updateUser(1L, saveUserDTO, bindingResult));
 
-        //assertEquals("Validation error", exception.getMessage());
         verify(bindingResult, times(1)).hasErrors();
         verify(userService, never()).updateUserById(anyLong(), any(SaveUserDTO.class));
     }

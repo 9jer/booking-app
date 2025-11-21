@@ -311,6 +311,7 @@ class BookingServiceImplTest {
         // Given
         when(bookingRepository.findBookingsByPropertyOrdered(1L))
                 .thenReturn(Collections.emptyList());
+        when(propertyClient.propertyExists(1L)).thenReturn(true);
 
         LocalDate today = LocalDate.now();
         LocalDate endDate = today.plusMonths(3);
@@ -322,7 +323,7 @@ class BookingServiceImplTest {
         // Then
         assertNotNull(result);
         assertFalse(result.isEmpty());
-        assertEquals(expectedDays, result.size()); // Точное количество дней между today и today+3 месяца
+        assertEquals(expectedDays, result.size());
         assertEquals(today, result.get(0));
         assertEquals(endDate.minusDays(1), result.get(result.size()-1));
     }
@@ -340,6 +341,7 @@ class BookingServiceImplTest {
 
         when(bookingRepository.findBookingsByPropertyOrdered(1L))
                 .thenReturn(List.of(booking1, booking2));
+        when(propertyClient.propertyExists(1L)).thenReturn(true);
 
         // When
         List<LocalDate> result = bookingService.getAvailableDates(1L);
@@ -347,11 +349,10 @@ class BookingServiceImplTest {
         // Then
         assertNotNull(result);
         assertFalse(result.isEmpty());
-        // Should include dates before first booking, between bookings, and after last booking
         assertTrue(result.contains(LocalDate.now()));
         assertTrue(result.contains(LocalDate.now().plusDays(8)));
         assertTrue(result.contains(LocalDate.now().plusDays(13)));
-        assertFalse(result.contains(LocalDate.now().plusDays(6))); // Booked date
+        assertFalse(result.contains(LocalDate.now().plusDays(6)));
     }
 
 }

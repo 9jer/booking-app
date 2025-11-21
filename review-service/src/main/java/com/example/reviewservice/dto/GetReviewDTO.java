@@ -7,6 +7,8 @@ import jakarta.validation.constraints.NotNull;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.time.LocalDateTime;
+
 @Getter
 @Setter
 public class GetReviewDTO {
@@ -27,4 +29,7 @@ public class GetReviewDTO {
     @NotEmpty(message = "Comment should not be empty!")
     private String comment;
 
+    private LocalDateTime createdAt;
+
+    private LocalDateTime updatedAt;
 }

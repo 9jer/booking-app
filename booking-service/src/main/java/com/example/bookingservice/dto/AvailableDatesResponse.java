@@ -1,4 +1,4 @@
-package com.example.propertyservice.dto;
+package com.example.bookingservice.dto;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;

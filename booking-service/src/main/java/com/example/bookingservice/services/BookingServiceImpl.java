@@ -12,6 +12,8 @@ import com.example.bookingservice.repositories.BookingRepository;
 import com.example.bookingservice.util.BookingException;
 import com.example.bookingservice.util.JwtTokenUtils;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -54,6 +56,7 @@ public class BookingServiceImpl implements BookingService {
 
     @Override
     @Transactional
+    @CacheEvict(value = "availableDates", key = "#booking.propertyId")
     public Booking createBooking(Booking booking, String token) {
 
         Boolean propertyExists = propertyClient.propertyExists(booking.getPropertyId());
@@ -94,6 +97,7 @@ public class BookingServiceImpl implements BookingService {
 
     @Override
     @Transactional
+    @CacheEvict(value = "availableDates", key = "#result.propertyId")
     public Booking updateBookingStatus(Long bookingId, BookingStatus bookingStatus) {
         Booking booking = getBookingById(bookingId);
         booking.setStatus(bookingStatus);
@@ -122,7 +126,13 @@ public class BookingServiceImpl implements BookingService {
     }
 
     @Override
+    @Cacheable(value = "availableDates", key = "#propertyId")
     public List<LocalDate> getAvailableDates(Long propertyId) {
+        Boolean propertyExists = propertyClient.propertyExists(propertyId);
+        if (propertyExists == null || !propertyExists) {
+            throw new BookingException("Property with id " + propertyId + " not found.");
+        }
+
         List<Booking> bookings = bookingRepository.findBookingsByPropertyOrdered(propertyId);
 
         List<LocalDate> availableDates = new ArrayList<>();

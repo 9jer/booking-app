@@ -3,6 +3,7 @@ package com.example.userservice.controllers;
 import com.example.userservice.dto.JwtRequest;
 import com.example.userservice.dto.SaveUserDTO;
 import com.example.userservice.dto.UserDTO;
+import com.example.userservice.models.Role;
 import com.example.userservice.models.User;
 import com.example.userservice.services.AuthService;
 import com.example.userservice.util.AuthException;
@@ -19,6 +20,8 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.stream.Collectors;
 
 @RestController
 @RequiredArgsConstructor
@@ -55,7 +58,13 @@ public class AuthController {
     }
 
     private UserDTO convertUserToUserDTO(User user) {
-        return modelMapper.map(user, UserDTO.class);
+        UserDTO userDTO = modelMapper.map(user, UserDTO.class);
+        if (user.getRoles() != null) {
+            userDTO.setRoles(user.getRoles().stream()
+                    .map(Role::getName)
+                    .collect(Collectors.toList()));
+        }
+        return userDTO;
     }
 
     @ExceptionHandler

@@ -18,7 +18,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.validation.BindingResult;
 
 import java.util.Collections;
-import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -87,24 +86,26 @@ class ReviewControllerTest {
     }
 
     @Test
-    void createReview_ValidRequest_ReturnsReview() {
+    void createReview_ValidRequest_ReturnsGetReviewDTO() {
         // Given
         String authHeader = "Bearer token";
         when(bindingResult.hasErrors()).thenReturn(false);
         when(modelMapper.map(any(ReviewDTO.class), eq(Review.class))).thenReturn(review);
         when(reviewService.saveReview(any(Review.class), anyString())).thenReturn(review);
+        when(modelMapper.map(review, GetReviewDTO.class)).thenReturn(getReviewDTO);
 
         // When
-        ResponseEntity<Review> response = reviewController.createReview(authHeader, reviewDTO, bindingResult);
+        ResponseEntity<GetReviewDTO> response = reviewController.createReview(authHeader, reviewDTO, bindingResult);
 
         // Then
         assertEquals(200, response.getStatusCodeValue());
         assertEquals(MediaType.APPLICATION_JSON, response.getHeaders().getContentType());
         assertNotNull(response.getBody());
-        assertEquals(review, response.getBody());
+        assertEquals(getReviewDTO, response.getBody());
 
         verify(reviewService, times(1)).saveReview(any(Review.class), anyString());
         verify(modelMapper, times(1)).map(any(ReviewDTO.class), eq(Review.class));
+        verify(modelMapper, times(1)).map(review, GetReviewDTO.class);
     }
 
     @Test
@@ -115,41 +116,42 @@ class ReviewControllerTest {
         //doThrow(new ReviewException("Validation error")).when(bindingResult).getAllErrors();
 
         // When & Then
-        ReviewException exception = assertThrows(ReviewException.class,
+        assertThrows(ReviewException.class,
                 () -> reviewController.createReview(authHeader, reviewDTO, bindingResult));
 
-        //assertEquals("Validation error", exception.getMessage());
         verify(bindingResult, times(1)).hasErrors();
         verify(reviewService, never()).saveReview(any(Review.class), anyString());
     }
 
     @Test
-    void updateReview_ValidRequest_ReturnsUpdatedReview() {
+    void updateReview_ValidRequest_ReturnsUpdatedGetReviewDTO() {
         // Given
         String authHeader = "Bearer token";
         when(bindingResult.hasErrors()).thenReturn(false);
         when(modelMapper.map(any(ReviewDTO.class), eq(Review.class))).thenReturn(review);
         when(reviewService.updateReview(any(Review.class), anyString())).thenReturn(review);
+        when(modelMapper.map(review, GetReviewDTO.class)).thenReturn(getReviewDTO);
 
         // When
-        ResponseEntity<Review> response = reviewController.updateReview(authHeader, 1L, reviewDTO, bindingResult);
+        ResponseEntity<GetReviewDTO> response = reviewController.updateReview(authHeader, 1L, reviewDTO, bindingResult);
 
         // Then
         assertEquals(200, response.getStatusCodeValue());
         assertEquals(MediaType.APPLICATION_JSON, response.getHeaders().getContentType());
         assertNotNull(response.getBody());
-        assertEquals(review, response.getBody());
+        assertEquals(getReviewDTO, response.getBody());
         assertEquals(1L, response.getBody().getId());
 
         verify(reviewService, times(1)).updateReview(any(Review.class), anyString());
         verify(modelMapper, times(1)).map(any(ReviewDTO.class), eq(Review.class));
+        verify(modelMapper, times(1)).map(review, GetReviewDTO.class);
     }
 
     @Test
     void deleteReview_ValidId_ReturnsNoContent() {
         // Given
         String authHeader = "Bearer token";
-        doNothing().when(reviewService).deleteReview(anyLong(), anyString());
+        when(reviewService.deleteReview(anyLong(), anyString())).thenReturn(review);
 
         // When
         ResponseEntity<Void> response = reviewController.deleteReview(authHeader, 1L);

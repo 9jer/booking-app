@@ -1,5 +1,6 @@
 package com.example.propertyservice.controllers;
 
+import com.example.propertyservice.dto.GetPropertyDTO;
 import com.example.propertyservice.dto.PropertyDTO;
 import com.example.propertyservice.models.Property;
 import com.example.propertyservice.services.PropertyService;
@@ -9,6 +10,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
+import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -21,9 +23,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -50,8 +50,12 @@ class PropertyControllerIT {
     @MockBean
     private JwtTokenUtils jwtTokenUtils;
 
+    @MockBean
+    private ModelMapper modelMapper;
+
     private Property testProperty;
     private PropertyDTO testPropertyDTO;
+    private GetPropertyDTO testGetPropertyDTO;
     private String validToken = "valid.token.here";
 
     @BeforeEach
@@ -73,57 +77,73 @@ class PropertyControllerIT {
         testPropertyDTO.setPricePerNight(BigDecimal.valueOf(100));
         testPropertyDTO.setCapacity(4);
 
+        testGetPropertyDTO = new GetPropertyDTO();
+        testGetPropertyDTO.setId(1L);
+        testGetPropertyDTO.setOwnerId(1L);
+        testGetPropertyDTO.setTitle("Test Property");
+        testGetPropertyDTO.setDescription("Test Description");
+        testGetPropertyDTO.setLocation("Test Location");
+        testGetPropertyDTO.setPricePerNight(BigDecimal.valueOf(100));
+        testGetPropertyDTO.setCapacity(4);
+
         Mockito.when(jwtTokenUtils.getUserId(anyString())).thenReturn(1L);
         Mockito.when(jwtTokenUtils.getRoles(anyString())).thenReturn(List.of("ROLE_OWNER"));
     }
 
     @Test
-    void createProperty_WithValidData_ShouldReturnCreatedProperty() throws Exception {
+    void createProperty_WithValidData_ShouldReturnCreatedPropertyDTO() throws Exception {
+        // Mock Service
         Mockito.when(propertyService.save(any(Property.class), anyString()))
                 .thenReturn(testProperty);
+        Mockito.when(modelMapper.map(any(PropertyDTO.class), eq(Property.class))).thenReturn(testProperty);
+        Mockito.when(modelMapper.map(testProperty, GetPropertyDTO.class)).thenReturn(testGetPropertyDTO);
 
         mockMvc.perform(post(ROOT_ENDPOINT)
                         .header("Authorization", "Bearer " + validToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(testPropertyDTO)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id").value(testProperty.getId()))
-                .andExpect(jsonPath("$.title").value(testProperty.getTitle()));
+                .andExpect(jsonPath("$.id").value(testGetPropertyDTO.getId()))
+                .andExpect(jsonPath("$.title").value(testGetPropertyDTO.getTitle()));
     }
 
     @Test
     void getAllProperties_ShouldReturnListOfProperties() throws Exception {
         Mockito.when(propertyService.findAll()).thenReturn(List.of(testProperty));
+        Mockito.when(modelMapper.map(testProperty, GetPropertyDTO.class)).thenReturn(testGetPropertyDTO);
 
         mockMvc.perform(get(ROOT_ENDPOINT)
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.properties[0].id").value(testProperty.getId()))
-                .andExpect(jsonPath("$.properties[0].title").value(testProperty.getTitle()));
+                .andExpect(jsonPath("$.properties[0].id").value(testGetPropertyDTO.getId()))
+                .andExpect(jsonPath("$.properties[0].title").value(testGetPropertyDTO.getTitle()));
     }
 
     @Test
     void getPropertyById_ShouldReturnProperty() throws Exception {
         Mockito.when(propertyService.getPropertyById(anyLong())).thenReturn(testProperty);
+        Mockito.when(modelMapper.map(testProperty, GetPropertyDTO.class)).thenReturn(testGetPropertyDTO);
 
         mockMvc.perform(get(ID_ENDPOINT, 1L)
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id").value(testProperty.getId()))
-                .andExpect(jsonPath("$.title").value(testProperty.getTitle()));
+                .andExpect(jsonPath("$.id").value(testGetPropertyDTO.getId()))
+                .andExpect(jsonPath("$.title").value(testGetPropertyDTO.getTitle()));
     }
 
     @Test
-    void updateProperty_WithValidData_ShouldReturnUpdatedProperty() throws Exception {
+    void updateProperty_WithValidData_ShouldReturnUpdatedPropertyDTO() throws Exception {
         Mockito.when(propertyService.updatePropertyById(anyLong(), any(Property.class), anyString()))
                 .thenReturn(testProperty);
+        Mockito.when(modelMapper.map(any(PropertyDTO.class), eq(Property.class))).thenReturn(testProperty);
+        Mockito.when(modelMapper.map(testProperty, GetPropertyDTO.class)).thenReturn(testGetPropertyDTO);
 
         mockMvc.perform(patch(ID_ENDPOINT, 1L)
                         .header("Authorization", "Bearer " + validToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(testPropertyDTO)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id").value(testProperty.getId()));
+                .andExpect(jsonPath("$.id").value(testGetPropertyDTO.getId()));
     }
 
     @Test
@@ -136,12 +156,13 @@ class PropertyControllerIT {
     void searchProperties_ShouldReturnFilteredProperties() throws Exception {
         Mockito.when(propertyService.search(anyString(), any(), any()))
                 .thenReturn(List.of(testProperty));
+        Mockito.when(modelMapper.map(testProperty, GetPropertyDTO.class)).thenReturn(testGetPropertyDTO);
 
         mockMvc.perform(get(SEARCH_ENDPOINT)
                         .param("location", "Test")
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].id").value(testProperty.getId()));
+                .andExpect(jsonPath("$.properties[0].id").value(testGetPropertyDTO.getId()));
     }
 
     @Test
