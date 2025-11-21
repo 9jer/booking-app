@@ -1,6 +1,7 @@
 package com.example.bookingservice.controllers;
 
 import com.example.bookingservice.dto.BookingDTO;
+import com.example.bookingservice.dto.GetBookingDTO;
 import com.example.bookingservice.models.Booking;
 import com.example.bookingservice.models.BookingStatus;
 import com.example.bookingservice.services.BookingService;
@@ -9,6 +10,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
+import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -22,9 +24,7 @@ import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
 
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(BookingController.class)
@@ -51,8 +51,12 @@ class BookingControllerIT {
     @MockBean
     private JwtTokenUtils jwtTokenUtils;
 
+    @MockBean
+    private ModelMapper modelMapper;
+
     private Booking testBooking;
     private BookingDTO testBookingDTO;
+    private GetBookingDTO testGetBookingDTO;
     private String validToken = "valid.token.here";
 
     @BeforeEach
@@ -72,6 +76,14 @@ class BookingControllerIT {
         testBookingDTO.setCheckOutDate(LocalDate.now().plusDays(3));
         testBookingDTO.setStatus(BookingStatus.PENDING);
 
+        testGetBookingDTO = new GetBookingDTO();
+        testGetBookingDTO.setId(1L);
+        testGetBookingDTO.setUserId(1L);
+        testGetBookingDTO.setPropertyId(1L);
+        testGetBookingDTO.setCheckInDate(LocalDate.now().plusDays(1));
+        testGetBookingDTO.setCheckOutDate(LocalDate.now().plusDays(3));
+        testGetBookingDTO.setStatus(BookingStatus.PENDING);
+
         Mockito.when(jwtTokenUtils.getUserId(anyString())).thenReturn(1L);
         Mockito.when(jwtTokenUtils.getEmail(anyString())).thenReturn("test@example.com");
         Mockito.when(jwtTokenUtils.getRoles(anyString())).thenReturn(List.of("ROLE_USER"));
@@ -80,23 +92,25 @@ class BookingControllerIT {
     @Test
     void getAllBookings_ShouldReturnListOfBookings() throws Exception {
         Mockito.when(bookingService.getAllBookings()).thenReturn(List.of(testBooking));
+        Mockito.when(modelMapper.map(any(Booking.class), eq(GetBookingDTO.class))).thenReturn(testGetBookingDTO);
 
         mockMvc.perform(MockMvcRequestBuilders.get(ROOT_ENDPOINT)
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.bookings[0].id").value(testBooking.getId()))
-                .andExpect(jsonPath("$.bookings[0].propertyId").value(testBooking.getPropertyId()));
+                .andExpect(jsonPath("$.bookings[0].id").value(testGetBookingDTO.getId()))
+                .andExpect(jsonPath("$.bookings[0].propertyId").value(testGetBookingDTO.getPropertyId()));
     }
 
     @Test
     void getBookingById_ShouldReturnBooking() throws Exception {
         Mockito.when(bookingService.getBookingById(anyLong())).thenReturn(testBooking);
+        Mockito.when(modelMapper.map(any(Booking.class), eq(GetBookingDTO.class))).thenReturn(testGetBookingDTO);
 
         mockMvc.perform(MockMvcRequestBuilders.get(ID_ENDPOINT, 1L)
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id").value(testBooking.getId()))
-                .andExpect(jsonPath("$.propertyId").value(testBooking.getPropertyId()));
+                .andExpect(jsonPath("$.id").value(testGetBookingDTO.getId()))
+                .andExpect(jsonPath("$.propertyId").value(testGetBookingDTO.getPropertyId()));
     }
 
     @Test
@@ -114,6 +128,8 @@ class BookingControllerIT {
     void createBooking_WithValidData_ShouldReturnCreatedBooking() throws Exception {
         Mockito.when(bookingService.createBooking(any(Booking.class), anyString()))
                 .thenReturn(testBooking);
+        Mockito.when(modelMapper.map(any(BookingDTO.class), eq(Booking.class))).thenReturn(testBooking);
+        Mockito.when(modelMapper.map(any(Booking.class), eq(GetBookingDTO.class))).thenReturn(testGetBookingDTO);
 
         mockMvc.perform(MockMvcRequestBuilders.post(ROOT_ENDPOINT)
                         .header("Authorization", "Bearer " + validToken)
@@ -121,14 +137,17 @@ class BookingControllerIT {
                         .content(objectMapper.writeValueAsString(testBookingDTO)))
                 .andExpect(status().isCreated())
                 .andExpect(header().exists("Location"))
-                .andExpect(jsonPath("$.id").value(testBooking.getId()));
+                .andExpect(jsonPath("$.id").value(testGetBookingDTO.getId()));
     }
 
     @Test
     void updateBookingStatus_ShouldReturnUpdatedBooking() throws Exception {
         testBooking.setStatus(BookingStatus.CONFIRMED);
+        testGetBookingDTO.setStatus(BookingStatus.CONFIRMED);
+
         Mockito.when(bookingService.updateBookingStatus(anyLong(), any(BookingStatus.class)))
                 .thenReturn(testBooking);
+        Mockito.when(modelMapper.map(any(Booking.class), eq(GetBookingDTO.class))).thenReturn(testGetBookingDTO);
 
         mockMvc.perform(MockMvcRequestBuilders.patch(STATUS_ENDPOINT, 1L)
                         .param("status", "CONFIRMED")
@@ -174,7 +193,7 @@ class BookingControllerIT {
                         .param("propertyId", "1")
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0]").value(availableDates.get(0).toString()))
-                .andExpect(jsonPath("$[1]").value(availableDates.get(1).toString()));
+                .andExpect(jsonPath("$.availableDates[0]").value(availableDates.get(0).toString()))
+                .andExpect(jsonPath("$.availableDates[1]").value(availableDates.get(1).toString()));
     }
 }

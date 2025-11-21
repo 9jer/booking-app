@@ -6,6 +6,7 @@ import lombok.Getter;
 import lombok.Setter;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 @Getter
 @Setter
@@ -27,4 +28,8 @@ public class GetBookingDTO {
 
     @NotNull(message = "status should not be empty!")
     private BookingStatus status;
+
+    private LocalDateTime createdAt;
+
+    private LocalDateTime updatedAt;
 }

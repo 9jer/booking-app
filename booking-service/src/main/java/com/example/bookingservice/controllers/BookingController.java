@@ -20,7 +20,6 @@ import org.springframework.web.bind.annotation.*;
 
 import java.net.URI;
 import java.time.LocalDate;
-import java.util.List;
 import java.util.stream.Collectors;
 
 @RestController
@@ -56,7 +55,7 @@ public class BookingController {
     }
 
     @PostMapping
-    public ResponseEntity<Booking> createBooking(@RequestHeader("Authorization") String authorizationHeader,
+    public ResponseEntity<GetBookingDTO> createBooking(@RequestHeader("Authorization") String authorizationHeader,
                                                  @RequestBody @Valid BookingDTO bookingDTO, BindingResult bindingResult){
         Booking booking = convertBookingDTOToBooking(bookingDTO);
 
@@ -71,16 +70,16 @@ public class BookingController {
         URI location = URI.create(rootEndpointUri + "/" + createdBooking.getId());
         return ResponseEntity.created(location)
                 .contentType(MediaType.APPLICATION_JSON)
-                .body(createdBooking);
+                .body(convertBookingToGetBookingDTO(createdBooking));
     }
 
     @PatchMapping(path = "${application.endpoint.booking-status}")
-    public ResponseEntity<Booking> updateBookingStatus(@PathVariable Long id, @RequestParam BookingStatus status){
+    public ResponseEntity<GetBookingDTO> updateBookingStatus(@PathVariable Long id, @RequestParam BookingStatus status){
         Booking updatedBooking = bookingService.updateBookingStatus(id, status);
 
         return ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_JSON)
-                .body(updatedBooking);
+                .body(convertBookingToGetBookingDTO(updatedBooking));
     }
 
     @GetMapping(path = "${application.endpoint.availability}")
@@ -96,10 +95,10 @@ public class BookingController {
     }
 
     @GetMapping(path = "${application.endpoint.available-dates}")
-    public ResponseEntity<List<LocalDate>> getAvailableDates(@RequestParam Long propertyId) {
+    public ResponseEntity<AvailableDatesResponse> getAvailableDates(@RequestParam Long propertyId) {
         return ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_JSON)
-                .body(bookingService.getAvailableDates(propertyId));
+                .body(new AvailableDatesResponse(bookingService.getAvailableDates(propertyId)));
     }
 
     private GetBookingDTO convertBookingToGetBookingDTO(Booking booking){

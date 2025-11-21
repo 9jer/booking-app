@@ -19,6 +19,7 @@ public class GetPropertyDTO {
     private String title;
     private String description;
     private String location;
+    private BigDecimal averageRating;
     private BigDecimal pricePerNight;
     private Integer capacity;
     private Set<PropertyFeatureDTO> features;
