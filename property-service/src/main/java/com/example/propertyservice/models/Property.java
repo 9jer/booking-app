@@ -50,7 +50,7 @@ public class Property {
     @NotNull(message = "Capacity should not be empty!")
     private Integer capacity;
 
-    @ManyToMany(cascade = {CascadeType.PERSIST})
+    @ManyToMany(cascade = {CascadeType.PERSIST}, fetch = FetchType.LAZY)
     @JoinTable(
             name = "Properties_Property_Feature",
             joinColumns = @JoinColumn(name = "property_id"),
