@@ -9,6 +9,7 @@ services:
       - SPRING_PROFILES_ACTIVE=docker
     volumes:
       - ./discovery-server/src/main/resources/application-docker.yml:/application-docker.yml
+    restart: unless-stopped
 
   api-gateway:
     image: 90jer/api-gateway:latest
@@ -23,6 +24,7 @@ services:
       - LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_SECURITY=TRACE
     volumes:
       - ./api-gateway/src/main/resources/application-docker.yml:/application-docker.yml
+    restart: unless-stopped
 
   notification-service:
     image: 90jer/notification-service:latest
@@ -37,6 +39,7 @@ services:
       - SPRING_PROFILES_ACTIVE=docker
     volumes:
       - ./notification-service/src/main/resources/application-docker.yml:/application-docker.yml
+    restart: on-failure
 
   booking-service:
     image: 90jer/booking-service:latest
@@ -53,9 +56,10 @@ services:
       - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres-booking:5432/booking_service_db
     volumes:
       - ./booking-service/src/main/resources/application-docker.yml:/application-docker.yml
+    restart: on-failure
 
   postgres-booking:
-    image: postgres:latest
+    image: postgres:16
     #container_name: postgres-booking
     environment:
       POSTGRES_DB: booking_service_db
@@ -77,14 +81,16 @@ services:
       - discovery-server
       - postgres-property
       - api-gateway
+      - redis
     environment:
       - SPRING_PROFILES_ACTIVE=docker
       - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres-property:5432/property_service_db
     volumes:
       - ./property-service/src/main/resources/application-docker.yml:/application-docker.yml
+    restart: on-failure
 
   postgres-property:
-    image: postgres:latest
+    image: postgres:16
     #container_name: postgres-property
     environment:
       POSTGRES_DB: property_service_db
@@ -106,14 +112,16 @@ services:
       - discovery-server
       - postgres-review
       - api-gateway
+      - redis
     environment:
       - SPRING_PROFILES_ACTIVE=docker
       - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres-review:5432/review_service_db
     volumes:
       - ./review-service/src/main/resources/application-docker.yml:/application-docker.yml
+    restart: on-failure
 
   postgres-review:
-    image: postgres:latest
+    image: postgres:16
     #container_name: postgres-review
     environment:
       POSTGRES_DB: review_service_db
@@ -135,14 +143,16 @@ services:
       - discovery-server
       - postgres-user
       - api-gateway
+      - redis
     environment:
       - SPRING_PROFILES_ACTIVE=docker
       - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres-user:5432/user_service_db
     volumes:
       - ./user-service/src/main/resources/application-docker.yml:/application-docker.yml
+    restart: on-failure
 
   postgres-user:
-    image: postgres:latest
+    image: postgres:16
     #container_name: postgres-user
     environment:
       POSTGRES_DB: user_service_db
@@ -154,8 +164,15 @@ services:
       - pg_user:/var/lib/postgresql/data
     restart: unless-stopped
 
+  redis:
+    image: redis:alpine
+    #container_name: redis
+    ports:
+      - "6379:6379"
+    restart: always
+
   zookeeper:
-    image: confluentinc/cp-zookeeper:latest
+    image: confluentinc/cp-zookeeper:7.3.0
     #container_name: zookeeper
     hostname: zookeeper
     environment:
@@ -163,9 +180,10 @@ services:
       ZOOKEEPER_TICK_TIME: 2000
     ports:
       - 2181:2181
+    restart: unless-stopped
 
   kafka:
-    image: confluentinc/cp-kafka:latest
+    image: confluentinc/cp-kafka:7.3.0
     #container_name: kafka
     hostname: kafka
     depends_on:
@@ -173,6 +191,7 @@ services:
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:29092,PLAINTEXT_HOST://0.0.0.0:9092
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
@@ -182,9 +201,10 @@ services:
       - 29092:29092
     volumes:
       - ./kafka/kafka.properties:/etc/kafka/kafka.properties
+    restart: unless-stopped
 
   schema-registry:
-    image: confluentinc/cp-schema-registry:latest
+    image: confluentinc/cp-schema-registry:7.3.0
     hostname: schema-registry
     #container_name: schema-registry
     depends_on:
@@ -193,8 +213,9 @@ services:
       - "8086:8081"
     environment:
       SCHEMA_REGISTRY_HOST_NAME: schema-registry
-      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: 'PLAINTEXT://kafka:9092'
+      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: 'PLAINTEXT://kafka:29092'
       SCHEMA_REGISTRY_LISTENERS: http://schema-registry:8081
+    restart: unless-stopped
 
   kafka-ui:
     image: provectuslabs/kafka-ui:latest
