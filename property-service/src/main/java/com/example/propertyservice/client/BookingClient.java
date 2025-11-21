@@ -1,5 +1,6 @@
 package com.example.propertyservice.client;
 
+import com.example.propertyservice.dto.AvailableDatesResponse;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -16,5 +17,5 @@ public interface BookingClient {
                                                @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate checkOut);
 
     @GetMapping(path = "${feign-client.endpoint.available-dates}")
-    List<LocalDate> getAvailableDates(@RequestParam Long propertyId);
+    AvailableDatesResponse getAvailableDates(@RequestParam Long propertyId);
 }

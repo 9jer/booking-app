@@ -32,7 +32,7 @@ public class PropertyController {
     private final ModelMapper modelMapper;
 
     @PostMapping
-    public ResponseEntity<Property> createProperty(@RequestHeader("Authorization") String authorizationHeader,
+    public ResponseEntity<GetPropertyDTO> createProperty(@RequestHeader("Authorization") String authorizationHeader,
                                                    @RequestBody @Valid PropertyDTO propertyDTO, BindingResult bindingResult) {
         Property property = convertPropertyDTOToProperty(propertyDTO);
 
@@ -46,11 +46,11 @@ public class PropertyController {
 
         return ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_JSON)
-                .body(savedProperty);
+                .body(convertPropertyToGetPropertyDTO(savedProperty));
     }
 
     @PatchMapping(path = "${application.endpoint.id}")
-    public ResponseEntity<Property> updateProperty(@RequestHeader("Authorization") String authorizationHeader,
+    public ResponseEntity<GetPropertyDTO> updateProperty(@RequestHeader("Authorization") String authorizationHeader,
                                                    @PathVariable("id") Long id, @RequestBody @Valid PropertyDTO propertyDTO, BindingResult bindingResult) {
         Property property = convertPropertyDTOToProperty(propertyDTO);
 
@@ -64,7 +64,7 @@ public class PropertyController {
 
         return ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_JSON)
-                .body(updatedProperty);
+                .body(convertPropertyToGetPropertyDTO(updatedProperty));
     }
 
     @DeleteMapping(path = "${application.endpoint.id}")
@@ -90,13 +90,19 @@ public class PropertyController {
     }
 
     @GetMapping(path = "${application.endpoint.search}")
-    public ResponseEntity<List<Property>> searchProperties(
+    public ResponseEntity<PropertiesResponse> searchProperties(
             @RequestParam(required = false) String location,
             @RequestParam(required = false) BigDecimal minPrice,
             @RequestParam(required = false) BigDecimal maxPrice) {
+        List<Property> properties = propertyService.search(location, minPrice, maxPrice);
+
+        List<GetPropertyDTO> propertyDTOs = properties.stream()
+                .map(this::convertPropertyToGetPropertyDTO)
+                .collect(Collectors.toList());
+
         return ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_JSON)
-                .body(propertyService.search(location, minPrice, maxPrice));
+                .body(new PropertiesResponse(propertyDTOs));
     }
 
 

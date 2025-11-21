@@ -74,24 +74,26 @@ class PropertyControllerTest {
     }
 
     @Test
-    void createProperty_ValidRequest_ReturnsProperty() {
+    void createProperty_ValidRequest_ReturnsGetPropertyDTO() {
         // Given
         String authHeader = "Bearer token";
         when(bindingResult.hasErrors()).thenReturn(false);
         when(modelMapper.map(any(PropertyDTO.class), eq(Property.class))).thenReturn(property);
         when(propertyService.save(any(Property.class), anyString())).thenReturn(property);
+        when(modelMapper.map(property, GetPropertyDTO.class)).thenReturn(getPropertyDTO);
 
         // When
-        ResponseEntity<Property> response = propertyController.createProperty(authHeader, propertyDTO, bindingResult);
+        ResponseEntity<GetPropertyDTO> response = propertyController.createProperty(authHeader, propertyDTO, bindingResult);
 
         // Then
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertEquals(MediaType.APPLICATION_JSON, response.getHeaders().getContentType());
         assertNotNull(response.getBody());
-        assertEquals(property, response.getBody());
+        assertEquals(getPropertyDTO, response.getBody());
 
         verify(propertyService, times(1)).save(any(Property.class), anyString());
         verify(modelMapper, times(1)).map(any(PropertyDTO.class), eq(Property.class));
+        verify(modelMapper, times(1)).map(property, GetPropertyDTO.class);
     }
 
     @Test
@@ -99,33 +101,32 @@ class PropertyControllerTest {
         // Given
         String authHeader = "Bearer token";
         when(bindingResult.hasErrors()).thenReturn(true);
-        //doThrow(new PropertyException("Validation error")).when(bindingResult).getAllErrors();
 
         // When & Then
-        PropertyException exception = assertThrows(PropertyException.class,
+        assertThrows(PropertyException.class,
                 () -> propertyController.createProperty(authHeader, propertyDTO, bindingResult));
 
-        //assertEquals("Validation error", exception.getMessage());
         verify(bindingResult, times(1)).hasErrors();
         verify(propertyService, never()).save(any(Property.class), anyString());
     }
 
     @Test
-    void updateProperty_ValidRequest_ReturnsUpdatedProperty() {
+    void updateProperty_ValidRequest_ReturnsUpdatedGetPropertyDTO() {
         // Given
         String authHeader = "Bearer token";
         when(bindingResult.hasErrors()).thenReturn(false);
         when(modelMapper.map(any(PropertyDTO.class), eq(Property.class))).thenReturn(property);
         when(propertyService.updatePropertyById(anyLong(), any(Property.class), anyString())).thenReturn(property);
+        when(modelMapper.map(property, GetPropertyDTO.class)).thenReturn(getPropertyDTO);
 
         // When
-        ResponseEntity<Property> response = propertyController.updateProperty(authHeader, 1L, propertyDTO, bindingResult);
+        ResponseEntity<GetPropertyDTO> response = propertyController.updateProperty(authHeader, 1L, propertyDTO, bindingResult);
 
         // Then
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertEquals(MediaType.APPLICATION_JSON, response.getHeaders().getContentType());
         assertNotNull(response.getBody());
-        assertEquals(property, response.getBody());
+        assertEquals(getPropertyDTO, response.getBody());
 
         verify(propertyService, times(1)).updatePropertyById(anyLong(), any(Property.class), anyString());
         verify(modelMapper, times(1)).map(any(PropertyDTO.class), eq(Property.class));
@@ -184,22 +185,23 @@ class PropertyControllerTest {
     }
 
     @Test
-    void searchProperties_WithParameters_ReturnsPropertyList() {
+    void searchProperties_WithParameters_ReturnsPropertiesResponse() {
         // Given
         String location = "Test";
         BigDecimal minPrice = BigDecimal.valueOf(50);
         BigDecimal maxPrice = BigDecimal.valueOf(150);
         when(propertyService.search(location, minPrice, maxPrice)).thenReturn(Collections.singletonList(property));
+        when(modelMapper.map(any(Property.class), eq(GetPropertyDTO.class))).thenReturn(getPropertyDTO);
 
         // When
-        ResponseEntity<List<Property>> response = propertyController.searchProperties(location, minPrice, maxPrice);
+        ResponseEntity<PropertiesResponse> response = propertyController.searchProperties(location, minPrice, maxPrice);
 
         // Then
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertEquals(MediaType.APPLICATION_JSON, response.getHeaders().getContentType());
         assertNotNull(response.getBody());
-        assertEquals(1, response.getBody().size());
-        assertEquals(property, response.getBody().get(0));
+        assertEquals(1, response.getBody().getProperties().size());
+        assertEquals(getPropertyDTO, response.getBody().getProperties().get(0));
 
         verify(propertyService, times(1)).search(location, minPrice, maxPrice);
     }

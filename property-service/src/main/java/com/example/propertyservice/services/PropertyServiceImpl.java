@@ -125,7 +125,7 @@ public class PropertyServiceImpl implements PropertyService {
 
     @Override
     public List<LocalDate> getAvailableDates(Long propertyId) {
-        return bookingClient.getAvailableDates(propertyId);
+        return bookingClient.getAvailableDates(propertyId).getAvailableDates();
     }
 
     @Override
