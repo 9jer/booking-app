@@ -9,6 +9,8 @@ import com.example.reviewservice.repositories.ReviewRepository;
 import com.example.reviewservice.util.JwtTokenUtils;
 import com.example.reviewservice.util.ReviewException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -27,12 +29,14 @@ public class ReviewServiceImpl implements ReviewService {
     private final RatingEventProducer ratingEventProducer;
 
     @Override
+    @Cacheable(value = "reviewsByProperty", key = "#propertyId")
     public List<Review> getReviewsByPropertyId(Long propertyId) {
         return reviewRepository.findByPropertyId(propertyId);
     }
 
     @Override
     @Transactional
+    @CacheEvict(value = "reviewsByProperty", key = "#review.propertyId")
     public Review saveReview(Review review, String token) {
         review.setId(null);
         Boolean propertyExists = propertyClient.propertyExists(review.getPropertyId());
@@ -75,6 +79,7 @@ public class ReviewServiceImpl implements ReviewService {
 
     @Override
     @Transactional
+    @CacheEvict(value = "reviewsByProperty", key = "#review.propertyId")
     public Review updateReview(Review review, String token) {
 
         Long userId = jwtTokenUtils.getUserId(token);
@@ -103,7 +108,8 @@ public class ReviewServiceImpl implements ReviewService {
 
     @Override
     @Transactional
-    public void deleteReview(Long reviewId, String token) {
+    @CacheEvict(value = "reviewsByProperty", key = "#result.propertyId")
+    public Review deleteReview(Long reviewId, String token) {
         Long userId = jwtTokenUtils.getUserId(token);
 
         Review existingReview = reviewRepository.findById(reviewId).orElseThrow(
@@ -117,6 +123,7 @@ public class ReviewServiceImpl implements ReviewService {
         reviewRepository.delete(existingReview);
 
         ratingEventProducer.sendRatingUpdatedEvent(propertyId);
+        return existingReview;
     }
 
     private void enrichUpdatedReview(Review existingReview) {

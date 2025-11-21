@@ -8,5 +8,5 @@ public interface ReviewService {
     List<Review> getReviewsByPropertyId(Long propertyId);
     Review saveReview(Review review, String token);
     Review updateReview(Review review, String token);
-    void deleteReview(Long reviewId, String token);
+    Review deleteReview(Long reviewId, String token);
 }
