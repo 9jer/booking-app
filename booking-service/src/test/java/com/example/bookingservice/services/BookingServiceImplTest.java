@@ -52,6 +52,9 @@ class BookingServiceImplTest {
     @Mock
     private BookingCreatedEventProducer producer;
 
+    @Mock
+    private BookingService self;
+
     @InjectMocks
     private BookingServiceImpl bookingService;
 
@@ -158,7 +161,11 @@ class BookingServiceImplTest {
         when(userClient.userExists(1L)).thenReturn(true);
         when(bookingRepository.countOverlappingBookings(1L, booking.getCheckInDate(), booking.getCheckOutDate()))
                 .thenReturn(0L);
-        when(bookingRepository.save(any(Booking.class))).thenReturn(booking);
+        when(bookingRepository.save(any(Booking.class))).thenAnswer(invocation -> {
+            Booking savedBooking = invocation.getArgument(0);
+            savedBooking.setId(1L);
+            return savedBooking;
+        });
         when(jwtTokenUtils.getEmail(token)).thenReturn("test@example.com");
         when(propertyClient.getPropertyById(1L)).thenReturn(propertyDTO);
 
@@ -167,7 +174,7 @@ class BookingServiceImplTest {
 
         // Then
         assertNotNull(result);
-        assertEquals(booking, result);
+        assertEquals(1L, result.getId());
         verify(bookingRepository, times(1)).save(booking);
         verify(bookingHistoryRepository, times(1)).save(any(BookingHistory.class));
         verify(producer, times(1)).sendBookingCreatedEvent(anyString(), any(BookingCreatedEvent.class));
@@ -228,11 +235,14 @@ class BookingServiceImplTest {
     @Transactional
     void updateBookingStatus_ValidData_UpdatesStatus() {
         // Given
+        String token = "valid-token";
+
         when(bookingRepository.findById(1L)).thenReturn(Optional.of(booking));
+        when(jwtTokenUtils.getRoles(token)).thenReturn(List.of("ROLE_ADMIN"));
         when(bookingRepository.save(any(Booking.class))).thenReturn(booking);
 
         // When
-        Booking result = bookingService.updateBookingStatus(1L, BookingStatus.CANCELLED);
+        Booking result = bookingService.updateBookingStatus(1L, BookingStatus.CANCELLED, token);
 
         // Then
         assertNotNull(result);
@@ -309,9 +319,9 @@ class BookingServiceImplTest {
     @Test
     void getAvailableDates_NoBookings_ReturnsAllDates() {
         // Given
-        when(bookingRepository.findBookingsByPropertyOrdered(1L))
-                .thenReturn(Collections.emptyList());
         when(propertyClient.propertyExists(1L)).thenReturn(true);
+        when(bookingRepository.findFutureBookings(eq(1L), any(LocalDate.class)))
+                .thenReturn(Collections.emptyList());
 
         LocalDate today = LocalDate.now();
         LocalDate endDate = today.plusMonths(3);
@@ -339,9 +349,9 @@ class BookingServiceImplTest {
         booking2.setCheckInDate(LocalDate.now().plusDays(10));
         booking2.setCheckOutDate(LocalDate.now().plusDays(12));
 
-        when(bookingRepository.findBookingsByPropertyOrdered(1L))
-                .thenReturn(List.of(booking1, booking2));
         when(propertyClient.propertyExists(1L)).thenReturn(true);
+        when(bookingRepository.findFutureBookings(eq(1L), any(LocalDate.class)))
+                .thenReturn(List.of(booking1, booking2));
 
         // When
         List<LocalDate> result = bookingService.getAvailableDates(1L);

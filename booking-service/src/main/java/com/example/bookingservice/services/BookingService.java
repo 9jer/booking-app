@@ -13,7 +13,7 @@ public interface BookingService {
     List<Booking> getBookingByPropertyId(Long propertyId);
     List<BookingHistory> getBookingHistoryByBookingId(Long bookingId);
     Booking createBooking(Booking booking, String token);
-    Booking updateBookingStatus(Long bookingId, BookingStatus bookingStatus);
+    Booking updateBookingStatus(Long bookingId, BookingStatus bookingStatus, String token);
     Boolean isAvailable(Long propertyId, LocalDate checkIn, LocalDate checkOut);
     Boolean whetherThereWasABooking(Long propertyId, Long userId);
     List<LocalDate> getAvailableDates(Long propertyId);

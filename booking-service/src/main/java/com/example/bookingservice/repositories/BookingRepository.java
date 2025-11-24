@@ -8,7 +8,6 @@ import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
 import java.util.List;
-import java.util.Optional;
 
 @Repository
 public interface BookingRepository extends JpaRepository<Booking, Long> {
@@ -18,9 +17,10 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
             "AND (b.checkOutDate >= :checkIn AND b.checkInDate <= :checkOut) AND b.status != 'CANCELLED'")
     Long countOverlappingBookings(Long propertyId, LocalDate checkIn, LocalDate checkOut);
 
-    @Query("SELECT b FROM Booking b WHERE b.propertyId = :propertyId ORDER BY b.checkInDate ASC")
-    List<Booking> findBookingsByPropertyOrdered(@Param("propertyId") Long propertyId);
+    @Query("SELECT b FROM Booking b WHERE b.propertyId = :propertyId AND b.checkOutDate >= :today ORDER BY b.checkInDate ASC")
+    List<Booking> findFutureBookings(@Param("propertyId") Long propertyId, @Param("today") LocalDate today);
 
-    @Query("SELECT b FROM Booking b WHERE b.propertyId = :propertyId AND b.userId = :userId and b.status <> 'PENDING'")
+    @Query("SELECT b FROM Booking b WHERE b.propertyId = :propertyId AND b.userId = :userId " +
+            "AND b.status = 'CONFIRMED' AND b.checkOutDate < CURRENT_DATE")
     List<Booking> findConfirmedBookingByPropertyIdAndUserId(Long propertyId, Long userId);
 }

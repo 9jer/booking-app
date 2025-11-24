@@ -2,6 +2,7 @@ package com.example.bookingservice.services;
 
 import com.example.bookingservice.client.PropertyClient;
 import com.example.bookingservice.client.UserClient;
+import com.example.bookingservice.dto.GetPropertyDTO;
 import com.example.bookingservice.event.BookingCreatedEvent;
 import com.example.bookingservice.event.BookingCreatedEventProducer;
 import com.example.bookingservice.models.Booking;
@@ -15,6 +16,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
@@ -55,10 +57,11 @@ public class BookingServiceImpl implements BookingService {
     }
 
     @Override
-    @Transactional
+    @Transactional(isolation = Isolation.SERIALIZABLE)
     @CacheEvict(value = "availableDates", key = "#booking.propertyId")
     public Booking createBooking(Booking booking, String token) {
-
+        booking.setId(null);
+        
         Boolean propertyExists = propertyClient.propertyExists(booking.getPropertyId());
         if (propertyExists == null || !propertyExists) {
             throw new BookingException("Property with id " + booking.getPropertyId() + " not found.");
@@ -85,8 +88,14 @@ public class BookingServiceImpl implements BookingService {
         BookingCreatedEvent bookingCreatedEvent = new BookingCreatedEvent();
         bookingCreatedEvent.setBookingId(booking.getId());
         bookingCreatedEvent.setEmail(jwtTokenUtils.getEmail(token));
-        bookingCreatedEvent.setPropertyName(propertyClient.getPropertyById(booking
-                .getPropertyId()).getTitle());
+
+        try {
+            bookingCreatedEvent.setPropertyName(propertyClient.getPropertyById(booking
+                    .getPropertyId()).getTitle());
+        } catch (Exception e) {
+            bookingCreatedEvent.setPropertyName("Unknown Property");
+        }
+
         bookingCreatedEvent.setCheckInDate(booking.getCheckInDate().toString());
         bookingCreatedEvent.setCheckOutDate(booking.getCheckOutDate().toString());
 
@@ -98,8 +107,19 @@ public class BookingServiceImpl implements BookingService {
     @Override
     @Transactional
     @CacheEvict(value = "availableDates", key = "#result.propertyId")
-    public Booking updateBookingStatus(Long bookingId, BookingStatus bookingStatus) {
+    public Booking updateBookingStatus(Long bookingId, BookingStatus bookingStatus, String token) {
         Booking booking = getBookingById(bookingId);
+
+        List<String> roles = jwtTokenUtils.getRoles(token);
+        if (!roles.contains("ROLE_ADMIN")) {
+            Long currentUserId = jwtTokenUtils.getUserId(token);
+            GetPropertyDTO property = propertyClient.getPropertyById(booking.getPropertyId());
+
+            if (!property.getOwnerId().equals(currentUserId)) {
+                throw new BookingException("You are not authorized to manage bookings for this property.");
+            }
+        }
+
         booking.setStatus(bookingStatus);
         booking.setUpdatedAt(LocalDateTime.now());
         saveHistory(booking, bookingStatus);
@@ -133,7 +153,7 @@ public class BookingServiceImpl implements BookingService {
             throw new BookingException("Property with id " + propertyId + " not found.");
         }
 
-        List<Booking> bookings = bookingRepository.findBookingsByPropertyOrdered(propertyId);
+        List<Booking> bookings = bookingRepository.findFutureBookings(propertyId, LocalDate.now());
 
         List<LocalDate> availableDates = new ArrayList<>();
         LocalDate today = LocalDate.now();
@@ -146,26 +166,30 @@ public class BookingServiceImpl implements BookingService {
             return availableDates;
         }
 
-        if (bookings.get(0).getCheckInDate().isAfter(today)) {
-            LocalDate start = today;
+        LocalDate currentDate = today;
+
+        if (bookings.get(0).getCheckInDate().isAfter(currentDate)) {
             LocalDate end = bookings.get(0).getCheckInDate().minusDays(1);
-            while (!start.isAfter(end)) {
-                availableDates.add(start);
-                start = start.plusDays(1);
+            while (!currentDate.isAfter(end) && currentDate.isBefore(maxDate)) {
+                availableDates.add(currentDate);
+                currentDate = currentDate.plusDays(1);
             }
         }
 
         for (int i = 0; i < bookings.size() - 1; i++) {
             LocalDate endOfCurrent = bookings.get(i).getCheckOutDate().plusDays(1);
             LocalDate startOfNext = bookings.get(i + 1).getCheckInDate().minusDays(1);
-            while (!endOfCurrent.isAfter(startOfNext)) {
+
+            if (endOfCurrent.isAfter(maxDate)) break;
+
+            while (!endOfCurrent.isAfter(startOfNext) && endOfCurrent.isBefore(maxDate)) {
                 availableDates.add(endOfCurrent);
                 endOfCurrent = endOfCurrent.plusDays(1);
             }
         }
 
         LocalDate lastBookingEnd = bookings.get(bookings.size() - 1).getCheckOutDate().plusDays(1);
-        while (!lastBookingEnd.isAfter(maxDate)) {
+        while (lastBookingEnd.isBefore(maxDate)) {
             availableDates.add(lastBookingEnd);
             lastBookingEnd = lastBookingEnd.plusDays(1);
         }

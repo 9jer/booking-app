@@ -74,8 +74,13 @@ public class BookingController {
     }
 
     @PatchMapping(path = "${application.endpoint.booking-status}")
-    public ResponseEntity<GetBookingDTO> updateBookingStatus(@PathVariable Long id, @RequestParam BookingStatus status){
-        Booking updatedBooking = bookingService.updateBookingStatus(id, status);
+    public ResponseEntity<GetBookingDTO> updateBookingStatus(
+            @RequestHeader("Authorization") String authorizationHeader,
+            @PathVariable Long id,
+            @RequestParam BookingStatus status) {
+
+        String jwtToken = authorizationHeader.replace("Bearer ", "");
+        Booking updatedBooking = bookingService.updateBookingStatus(id, status, jwtToken);
 
         return ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_JSON)

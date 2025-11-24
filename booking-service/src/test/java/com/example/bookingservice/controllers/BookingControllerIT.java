@@ -145,11 +145,12 @@ class BookingControllerIT {
         testBooking.setStatus(BookingStatus.CONFIRMED);
         testGetBookingDTO.setStatus(BookingStatus.CONFIRMED);
 
-        Mockito.when(bookingService.updateBookingStatus(anyLong(), any(BookingStatus.class)))
+        Mockito.when(bookingService.updateBookingStatus(anyLong(), any(BookingStatus.class), anyString()))
                 .thenReturn(testBooking);
         Mockito.when(modelMapper.map(any(Booking.class), eq(GetBookingDTO.class))).thenReturn(testGetBookingDTO);
 
         mockMvc.perform(MockMvcRequestBuilders.patch(STATUS_ENDPOINT, 1L)
+                        .header("Authorization", "Bearer " + validToken)
                         .param("status", "CONFIRMED")
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())

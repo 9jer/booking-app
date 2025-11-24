@@ -195,11 +195,14 @@ class BookingControllerTest {
     @Test
     void updateBookingStatus_ValidRequest_ReturnsUpdatedBooking() {
         // Given
-        when(bookingService.updateBookingStatus(1L, BookingStatus.CANCELLED)).thenReturn(booking);
+        String token = "Bearer test-token";
+
+        when(bookingService.updateBookingStatus(eq(1L), eq(BookingStatus.CANCELLED), anyString()))
+                .thenReturn(booking);
         when(modelMapper.map(booking, GetBookingDTO.class)).thenReturn(getBookingDTO);
 
         // When
-        ResponseEntity<GetBookingDTO> response = bookingController.updateBookingStatus(1L, BookingStatus.CANCELLED);
+        ResponseEntity<GetBookingDTO> response = bookingController.updateBookingStatus(token, 1L, BookingStatus.CANCELLED);
 
         // Then
         assertEquals(200, response.getStatusCodeValue());
@@ -207,7 +210,7 @@ class BookingControllerTest {
         assertNotNull(response.getBody());
         assertEquals(getBookingDTO, response.getBody());
 
-        verify(bookingService, times(1)).updateBookingStatus(1L, BookingStatus.CANCELLED);
+        verify(bookingService, times(1)).updateBookingStatus(eq(1L), eq(BookingStatus.CANCELLED), anyString());
         verify(modelMapper, times(1)).map(booking, GetBookingDTO.class);
     }
 
