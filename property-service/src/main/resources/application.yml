@@ -33,10 +33,10 @@ spring:
     consumer:
       group-id: property-rating-updater
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
-      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      value-deserializer: io.confluent.kafka.serializers.KafkaAvroDeserializer
       properties:
-        spring.json.trusted.packages: com.example.reviewservice.event
-        spring.json.value.default.type: com.example.reviewservice.event.RatingUpdatedEvent
+        schema.registry.url: http://localhost:8081
+        specific.avro.reader: true
 
 springdoc:
   swagger-ui:

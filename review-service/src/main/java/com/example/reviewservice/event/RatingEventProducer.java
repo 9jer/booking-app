@@ -24,10 +24,11 @@ public class RatingEventProducer {
         BigDecimal roundedRating = BigDecimal.valueOf(averageRating)
                 .setScale(2, RoundingMode.HALF_UP);
 
-        var event = new RatingUpdatedEvent();
-        event.setPropertyId(propertyId);
-        event.setNewAverageRating(roundedRating.doubleValue());
-        event.setTotalReviews(totalReviews);
+        RatingUpdatedEvent event = RatingUpdatedEvent.newBuilder()
+                .setPropertyId(propertyId)
+                .setNewAverageRating(roundedRating.doubleValue())
+                .setTotalReviews(totalReviews)
+                .build();
 
         log.info("Start - Sending RatingUpdatedEvent {} to Kafka topic rating-updated", event);
         kafkaTemplate.send("rating-updated", event);
