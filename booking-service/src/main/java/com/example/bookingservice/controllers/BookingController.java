@@ -32,18 +32,31 @@ public class BookingController {
     private String rootEndpointUri;
 
     @GetMapping
-    public ResponseEntity<BookingsResponse> getAllBookings(){
+    public ResponseEntity<BookingsResponse> getAllBookings(@RequestHeader("Authorization") String authorizationHeader){
+        String jwtToken = authorizationHeader.replace("Bearer ", "");
         return ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_JSON)
-                .body(new BookingsResponse(bookingService.getAllBookings().stream()
+                .body(new BookingsResponse(bookingService.getAllBookings(jwtToken).stream()
                         .map(this::convertBookingToGetBookingDTO).collect(Collectors.toList())));
     }
 
     @GetMapping(path = "${application.endpoint.id}")
-    public ResponseEntity<GetBookingDTO> getBookingById(@PathVariable("id") Long id){
+    public ResponseEntity<GetBookingDTO> getBookingById(@PathVariable("id") Long id,
+                                                        @RequestHeader("Authorization") String authorizationHeader){
+        String jwtToken = authorizationHeader.replace("Bearer ", "");
         return ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_JSON)
-                .body(convertBookingToGetBookingDTO(bookingService.getBookingById(id)));
+                .body(convertBookingToGetBookingDTO(bookingService.getBookingById(id, jwtToken)));
+    }
+
+    @GetMapping("/property/{id}")
+    public ResponseEntity<BookingsResponse> getBookingsByPropertyId(@PathVariable("id") Long propertyId,
+                                                                    @RequestHeader("Authorization") String authorizationHeader){
+        String jwtToken = authorizationHeader.replace("Bearer ", "");
+        return ResponseEntity.ok()
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(new BookingsResponse(bookingService.getBookingByPropertyId(propertyId, jwtToken).stream()
+                        .map(this::convertBookingToGetBookingDTO).collect(Collectors.toList())));
     }
 
     @GetMapping(path = "${application.endpoint.booking-history-by-id}")

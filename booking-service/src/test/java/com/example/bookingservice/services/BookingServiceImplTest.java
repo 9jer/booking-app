@@ -32,7 +32,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
-class BookingServiceImplTest {
+    class BookingServiceImplTest {
 
     @Mock
     private BookingRepository bookingRepository;
@@ -60,6 +60,7 @@ class BookingServiceImplTest {
 
     private Booking booking;
     private BookingHistory bookingHistory;
+    private String token = "valid-token";
 
     @BeforeEach
     void setUp() {
@@ -80,12 +81,13 @@ class BookingServiceImplTest {
     }
 
     @Test
-    void getAllBookings_ReturnsListOfBookings() {
+    void getAllBookings_Admin_ReturnsListOfBookings() {
         // Given
+        when(jwtTokenUtils.getRoles(token)).thenReturn(List.of("ROLE_ADMIN"));
         when(bookingRepository.findAll()).thenReturn(Collections.singletonList(booking));
 
         // When
-        List<Booking> result = bookingService.getAllBookings();
+        List<Booking> result = bookingService.getAllBookings(token);
 
         // Then
         assertEquals(1, result.size());
@@ -97,9 +99,10 @@ class BookingServiceImplTest {
     void getBookingById_BookingExists_ReturnsBooking() {
         // Given
         when(bookingRepository.findById(1L)).thenReturn(Optional.of(booking));
+        when(jwtTokenUtils.getUserId(token)).thenReturn(1L);
 
         // When
-        Booking result = bookingService.getBookingById(1L);
+        Booking result = bookingService.getBookingById(1L, token);
 
         // Then
         assertNotNull(result);
@@ -114,7 +117,7 @@ class BookingServiceImplTest {
 
         // When & Then
         BookingException exception = assertThrows(BookingException.class,
-                () -> bookingService.getBookingById(1L));
+                () -> bookingService.getBookingById(1L, token));
 
         assertEquals("Booking not found", exception.getMessage());
         verify(bookingRepository, times(1)).findById(1L);
@@ -123,10 +126,16 @@ class BookingServiceImplTest {
     @Test
     void getBookingByPropertyId_ReturnsListOfBookings() {
         // Given
+        GetPropertyDTO propertyDTO = new GetPropertyDTO();
+        propertyDTO.setOwnerId(1L);
+
+        when(jwtTokenUtils.getRoles(token)).thenReturn(List.of("ROLE_OWNER"));
+        when(jwtTokenUtils.getUserId(token)).thenReturn(1L);
+        when(propertyClient.getPropertyById(1L)).thenReturn(propertyDTO);
         when(bookingRepository.findByPropertyId(1L)).thenReturn(Collections.singletonList(booking));
 
         // When
-        List<Booking> result = bookingService.getBookingByPropertyId(1L);
+        List<Booking> result = bookingService.getBookingByPropertyId(1L, token);
 
         // Then
         assertEquals(1, result.size());
@@ -152,7 +161,6 @@ class BookingServiceImplTest {
     @Transactional
     void createBooking_ValidData_CreatesBooking() {
         // Given
-        String token = "valid-token";
         GetPropertyDTO propertyDTO = new GetPropertyDTO();
         propertyDTO.setTitle("Test Property");
 
@@ -184,7 +192,6 @@ class BookingServiceImplTest {
     @Transactional
     void createBooking_PropertyNotExists_ThrowsException() {
         // Given
-        String token = "valid-token";
         when(propertyClient.propertyExists(1L)).thenReturn(false);
 
         // When & Then
@@ -199,7 +206,6 @@ class BookingServiceImplTest {
     @Transactional
     void createBooking_UserNotExists_ThrowsException() {
         // Given
-        String token = "valid-token";
         when(propertyClient.propertyExists(1L)).thenReturn(true);
         when(jwtTokenUtils.getUserId(token)).thenReturn(1L);
         when(userClient.userExists(1L)).thenReturn(false);
@@ -216,7 +222,6 @@ class BookingServiceImplTest {
     @Transactional
     void createBooking_PropertyNotAvailable_ThrowsException() {
         // Given
-        String token = "valid-token";
         when(propertyClient.propertyExists(1L)).thenReturn(true);
         when(jwtTokenUtils.getUserId(token)).thenReturn(1L);
         when(userClient.userExists(1L)).thenReturn(true);
@@ -227,7 +232,7 @@ class BookingServiceImplTest {
         BookingException exception = assertThrows(BookingException.class,
                 () -> bookingService.createBooking(booking, token));
 
-        assertEquals("Property is not available", exception.getMessage());
+        assertEquals("Property is not available for selected dates.", exception.getMessage());
         verify(bookingRepository, never()).save(any(Booking.class));
     }
 
@@ -235,8 +240,6 @@ class BookingServiceImplTest {
     @Transactional
     void updateBookingStatus_ValidData_UpdatesStatus() {
         // Given
-        String token = "valid-token";
-
         when(bookingRepository.findById(1L)).thenReturn(Optional.of(booking));
         when(jwtTokenUtils.getRoles(token)).thenReturn(List.of("ROLE_ADMIN"));
         when(bookingRepository.save(any(Booking.class))).thenReturn(booking);

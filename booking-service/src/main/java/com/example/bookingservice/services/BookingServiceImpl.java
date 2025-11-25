@@ -35,19 +35,59 @@ public class BookingServiceImpl implements BookingService {
     private final JwtTokenUtils jwtTokenUtils;
     private final BookingCreatedEventProducer producer;
 
+    private static final int MAX_BOOKING_WINDOW_MONTHS = 3;
+
     @Override
-    public List<Booking> getAllBookings() {
-        return bookingRepository.findAll();
+    public List<Booking> getAllBookings(String token) {
+        List<String> roles = jwtTokenUtils.getRoles(token);
+        if (roles.contains("ROLE_ADMIN")) {
+            return bookingRepository.findAll();
+        }
+
+        Long currentUserId = jwtTokenUtils.getUserId(token);
+        return bookingRepository.findByUserId(currentUserId);
     }
 
     @Override
-    public Booking getBookingById(Long bookingId) {
-        return bookingRepository.findById(bookingId)
-                .orElseThrow(()-> new BookingException("Booking not found"));
+    public Booking getBookingById(Long bookingId, String token) {
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new BookingException("Booking not found"));
+
+        Long currentUserId = jwtTokenUtils.getUserId(token);
+        List<String> roles = jwtTokenUtils.getRoles(token);
+
+        if (roles.contains("ROLE_ADMIN")) {
+            return booking;
+        }
+
+        if (booking.getUserId().equals(currentUserId)) {
+            return booking;
+        }
+
+        GetPropertyDTO property = propertyClient.getPropertyById(booking.getPropertyId());
+        if (property.getOwnerId().equals(currentUserId)) {
+            return booking;
+        }
+
+        throw new BookingException("You do not have permission to view this booking.");
     }
 
     @Override
-    public List<Booking> getBookingByPropertyId(Long propertyId) {
+    public List<Booking> getBookingByPropertyId(Long propertyId, String token) {
+        List<String> roles = jwtTokenUtils.getRoles(token);
+        if (!roles.contains("ROLE_ADMIN")) {
+            Long currentUserId = jwtTokenUtils.getUserId(token);
+            GetPropertyDTO property = propertyClient.getPropertyById(propertyId);
+
+            if (property == null) {
+                throw new BookingException("Property not found");
+            }
+
+            if (!property.getOwnerId().equals(currentUserId)) {
+                throw new BookingException("You do not have permission to view bookings for this property.");
+            }
+        }
+
         return bookingRepository.findByPropertyId(propertyId);
     }
 
@@ -61,7 +101,13 @@ public class BookingServiceImpl implements BookingService {
     @CacheEvict(value = "availableDates", key = "#booking.propertyId")
     public Booking createBooking(Booking booking, String token) {
         booking.setId(null);
-        
+
+        if (booking.getStatus() == null) {
+            booking.setStatus(BookingStatus.PENDING);
+        }
+
+        validateBookingDates(booking.getCheckInDate(), booking.getCheckOutDate());
+
         Boolean propertyExists = propertyClient.propertyExists(booking.getPropertyId());
         if (propertyExists == null || !propertyExists) {
             throw new BookingException("Property with id " + booking.getPropertyId() + " not found.");
@@ -70,36 +116,21 @@ public class BookingServiceImpl implements BookingService {
         booking.setUserId(jwtTokenUtils.getUserId(token));
 
         Boolean userExists = userClient.userExists(booking.getUserId());
-
         if (userExists == null || !userExists) {
-            throw new BookingException("User with id " + booking.getUserId()
-                    + " not found.");
+            throw new BookingException("User with id " + booking.getUserId() + " not found.");
         }
 
-        if(!isAvailable(booking.getPropertyId(), booking.getCheckInDate(), booking.getCheckOutDate())){
-            throw new BookingException("Property is not available");
+        if (!isAvailable(booking.getPropertyId(), booking.getCheckInDate(), booking.getCheckOutDate())) {
+            throw new BookingException("Property is not available for selected dates.");
         }
 
-        //booking.setStatus(BookingStatus.PENDING);
         booking.setCreatedAt(LocalDateTime.now());
         Booking savedBooking = bookingRepository.save(booking);
         saveHistory(savedBooking, booking.getStatus());
 
-        BookingCreatedEvent bookingCreatedEvent = new BookingCreatedEvent();
-        bookingCreatedEvent.setBookingId(booking.getId());
-        bookingCreatedEvent.setEmail(jwtTokenUtils.getEmail(token));
-
-        try {
-            bookingCreatedEvent.setPropertyName(propertyClient.getPropertyById(booking
-                    .getPropertyId()).getTitle());
-        } catch (Exception e) {
-            bookingCreatedEvent.setPropertyName("Unknown Property");
+        if (savedBooking.getStatus() == BookingStatus.CONFIRMED) {
+            sendNotification(savedBooking, token);
         }
-
-        bookingCreatedEvent.setCheckInDate(booking.getCheckInDate().toString());
-        bookingCreatedEvent.setCheckOutDate(booking.getCheckOutDate().toString());
-
-        producer.sendBookingCreatedEvent("booking-created", bookingCreatedEvent);
 
         return savedBooking;
     }
@@ -108,7 +139,12 @@ public class BookingServiceImpl implements BookingService {
     @Transactional
     @CacheEvict(value = "availableDates", key = "#result.propertyId")
     public Booking updateBookingStatus(Long bookingId, BookingStatus bookingStatus, String token) {
-        Booking booking = getBookingById(bookingId);
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new BookingException("Booking not found"));
+
+        if (booking.getStatus() == bookingStatus) {
+            return booking;
+        }
 
         List<String> roles = jwtTokenUtils.getRoles(token);
         if (!roles.contains("ROLE_ADMIN")) {
@@ -123,14 +159,19 @@ public class BookingServiceImpl implements BookingService {
         booking.setStatus(bookingStatus);
         booking.setUpdatedAt(LocalDateTime.now());
         saveHistory(booking, bookingStatus);
-        return bookingRepository.save(booking);
+
+        Booking updatedBooking = bookingRepository.save(booking);
+
+        if (updatedBooking.getStatus() == BookingStatus.CONFIRMED) {
+            sendNotification(updatedBooking, token);
+        }
+
+        return updatedBooking;
     }
 
     @Override
     public Boolean isAvailable(Long propertyId, LocalDate checkIn, LocalDate checkOut) {
-        if (checkIn.isAfter(checkOut) || checkIn.isEqual(checkOut)) {
-            throw new BookingException("Check-in date must be before check-out date.");
-        }
+        validateBookingDates(checkIn, checkOut);
 
         Boolean propertyExists = propertyClient.propertyExists(propertyId);
         if (propertyExists == null || !propertyExists) {
@@ -141,8 +182,8 @@ public class BookingServiceImpl implements BookingService {
     }
 
     @Override
-    public Boolean whetherThereWasABooking(Long propertyId, Long userId){
-        return !(bookingRepository.findConfirmedBookingByPropertyIdAndUserId(propertyId, userId).isEmpty());
+    public Boolean whetherThereWasABooking(Long propertyId, Long userId) {
+        return !bookingRepository.findConfirmedBookingByPropertyIdAndUserId(propertyId, userId).isEmpty();
     }
 
     @Override
@@ -157,7 +198,7 @@ public class BookingServiceImpl implements BookingService {
 
         List<LocalDate> availableDates = new ArrayList<>();
         LocalDate today = LocalDate.now();
-        LocalDate maxDate = today.plusMonths(3);
+        LocalDate maxDate = today.plusMonths(MAX_BOOKING_WINDOW_MONTHS);
 
         if (bookings.isEmpty()) {
             for (LocalDate date = today; date.isBefore(maxDate); date = date.plusDays(1)) {
@@ -203,5 +244,35 @@ public class BookingServiceImpl implements BookingService {
         bookingHistory.setChangedAt(LocalDateTime.now());
         bookingHistory.setStatus(bookingStatus.name());
         bookingHistoryRepository.save(bookingHistory);
+    }
+
+    private void validateBookingDates(LocalDate checkIn, LocalDate checkOut) {
+        if (checkIn.isAfter(checkOut) || checkIn.isEqual(checkOut)) {
+            throw new BookingException("Check-in date must be before check-out date.");
+        }
+        if (checkIn.isBefore(LocalDate.now())) {
+            throw new BookingException("Cannot book dates in the past.");
+        }
+        if (checkOut.isAfter(LocalDate.now().plusMonths(MAX_BOOKING_WINDOW_MONTHS))) {
+            throw new BookingException("Cannot book more than " + MAX_BOOKING_WINDOW_MONTHS + " months in advance.");
+        }
+    }
+
+    private void sendNotification(Booking booking, String token) {
+        BookingCreatedEvent bookingCreatedEvent = new BookingCreatedEvent();
+        bookingCreatedEvent.setBookingId(booking.getId());
+        bookingCreatedEvent.setEmail(jwtTokenUtils.getEmail(token));
+
+        try {
+            String propertyTitle = propertyClient.getPropertyById(booking.getPropertyId()).getTitle();
+            bookingCreatedEvent.setPropertyName(propertyTitle);
+        } catch (Exception e) {
+            bookingCreatedEvent.setPropertyName("Unknown Property");
+        }
+
+        bookingCreatedEvent.setCheckInDate(booking.getCheckInDate().toString());
+        bookingCreatedEvent.setCheckOutDate(booking.getCheckOutDate().toString());
+
+        producer.sendBookingCreatedEvent("booking-created", bookingCreatedEvent);
     }
 }

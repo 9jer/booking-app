@@ -8,9 +8,9 @@ import java.time.LocalDate;
 import java.util.List;
 
 public interface BookingService {
-    List<Booking> getAllBookings();
-    Booking getBookingById(Long bookingId);
-    List<Booking> getBookingByPropertyId(Long propertyId);
+    List<Booking> getAllBookings(String token);
+    Booking getBookingById(Long bookingId, String token);
+    List<Booking> getBookingByPropertyId(Long propertyId, String token);
     List<BookingHistory> getBookingHistoryByBookingId(Long bookingId);
     Booking createBooking(Booking booking, String token);
     Booking updateBookingStatus(Long bookingId, BookingStatus bookingStatus, String token);

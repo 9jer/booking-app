@@ -22,6 +22,5 @@ public class BookingDTO {
     @NotNull(message = "checkOutDate should not be empty!")
     private LocalDate checkOutDate;
 
-    @NotNull(message = "status should not be empty!")
     private BookingStatus status;
 }

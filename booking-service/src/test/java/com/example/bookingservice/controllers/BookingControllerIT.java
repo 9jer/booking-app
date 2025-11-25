@@ -91,10 +91,11 @@ class BookingControllerIT {
 
     @Test
     void getAllBookings_ShouldReturnListOfBookings() throws Exception {
-        Mockito.when(bookingService.getAllBookings()).thenReturn(List.of(testBooking));
+        Mockito.when(bookingService.getAllBookings(anyString())).thenReturn(List.of(testBooking));
         Mockito.when(modelMapper.map(any(Booking.class), eq(GetBookingDTO.class))).thenReturn(testGetBookingDTO);
 
         mockMvc.perform(MockMvcRequestBuilders.get(ROOT_ENDPOINT)
+                        .header("Authorization", "Bearer " + validToken)
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.bookings[0].id").value(testGetBookingDTO.getId()))
@@ -103,10 +104,11 @@ class BookingControllerIT {
 
     @Test
     void getBookingById_ShouldReturnBooking() throws Exception {
-        Mockito.when(bookingService.getBookingById(anyLong())).thenReturn(testBooking);
+        Mockito.when(bookingService.getBookingById(anyLong(), anyString())).thenReturn(testBooking);
         Mockito.when(modelMapper.map(any(Booking.class), eq(GetBookingDTO.class))).thenReturn(testGetBookingDTO);
 
         mockMvc.perform(MockMvcRequestBuilders.get(ID_ENDPOINT, 1L)
+                        .header("Authorization", "Bearer " + validToken)
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(testGetBookingDTO.getId()))
