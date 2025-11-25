@@ -5,6 +5,7 @@ import com.example.userservice.models.Role;
 import com.example.userservice.models.User;
 import com.example.userservice.repositories.UserRepository;
 import com.example.userservice.util.ErrorsUtil;
+import com.example.userservice.util.JwtTokenUtils;
 import com.example.userservice.util.UserException;
 import org.modelmapper.ModelMapper;
 import org.springframework.cache.Cache;
@@ -32,17 +33,20 @@ public class UserServiceImpl implements UserService {
     private final PasswordEncoder passwordEncoder;
     private final ModelMapper modelMapper;
     private final CacheManager cacheManager;
+    private final JwtTokenUtils jwtTokenUtils;
 
     private final UserService self;
 
     public UserServiceImpl(@Lazy UserService self, UserRepository userRepository, RoleService roleService,
-                           PasswordEncoder passwordEncoder, ModelMapper modelMapper, CacheManager cacheManager) {
+                           PasswordEncoder passwordEncoder, ModelMapper modelMapper, CacheManager cacheManager,
+                           JwtTokenUtils jwtTokenUtils) {
         this.self = self;
         this.userRepository = userRepository;
         this.roleService = roleService;
         this.passwordEncoder = passwordEncoder;
         this.modelMapper = modelMapper;
         this.cacheManager = cacheManager;
+        this.jwtTokenUtils = jwtTokenUtils;
     }
 
     @Override
@@ -93,7 +97,14 @@ public class UserServiceImpl implements UserService {
     @Override
     @Transactional
     @CachePut(value = "userById", key = "#id")
-    public User updateUserById(Long id, SaveUserDTO updatedUser) {
+    public User updateUserById(Long id, SaveUserDTO updatedUser, String token) {
+        Long currentUserId = jwtTokenUtils.getUserId(token);
+        List<String> roles = jwtTokenUtils.getRoles(token);
+
+        if (!roles.contains("ROLE_ADMIN") && !currentUserId.equals(id)) {
+            throw new UserException("You can only update your own account.");
+        }
+
         Optional<User> userByUsername = self.findByUsername(updatedUser.getUsername());
         Optional<User> userByEmail = self.findByEmail(updatedUser.getEmail());
 
@@ -137,11 +148,15 @@ public class UserServiceImpl implements UserService {
     @CachePut(value = "userById", key = "#userId")
     public User assignOwnerRole(Long userId) {
         User user = userRepository.findById(userId).orElseThrow(() ->
-                new RuntimeException("User not found"));
-
-        evictUserCaches(user);
+                new UserException("User not found"));
 
         Role ownerRole = roleService.getOwnerRole();
+
+        if (user.getRoles().stream().anyMatch(role -> role.getName().equals(ownerRole.getName()))) {
+            throw new UserException("User already has OWNER role");
+        }
+
+        evictUserCaches(user);
         user.getRoles().add(ownerRole);
 
         User savedUser = userRepository.save(user);
@@ -155,11 +170,20 @@ public class UserServiceImpl implements UserService {
 
     @Override
     @Transactional
-    public void deleteUserById(Long id) {
+    public void deleteUserById(Long id, String token) {
+        Long currentUserId = jwtTokenUtils.getUserId(token);
+        List<String> roles = jwtTokenUtils.getRoles(token);
+
+        if (!roles.contains("ROLE_ADMIN") && !currentUserId.equals(id)) {
+            throw new UserException("You can only delete your own account.");
+        }
+
         User user = userRepository.findById(id).orElseThrow(() -> new UserException("User not found"));
 
         evictUserCaches(user);
-        Objects.requireNonNull(cacheManager.getCache("userById")).evict(id);
+        if (cacheManager.getCache("userById") != null) {
+            Objects.requireNonNull(cacheManager.getCache("userById")).evict(id);
+        }
 
         userRepository.delete(user);
     }

@@ -36,20 +36,25 @@ public class UserController {
     }
 
     @PatchMapping(path = "${application.endpoint.users.id}")
-    public ResponseEntity<UserDTO> updateUser(@PathVariable("id") Long id, @RequestBody @Valid SaveUserDTO saveUserDTO, BindingResult bindingResult) {
+    public ResponseEntity<UserDTO> updateUser(@RequestHeader("Authorization") String authorizationHeader,
+                                              @PathVariable("id") Long id, @RequestBody @Valid SaveUserDTO saveUserDTO, BindingResult bindingResult) {
 
         if(bindingResult.hasErrors()) {
             ErrorsUtil.returnAllErrors(bindingResult);
         }
 
+        String jwtToken = authorizationHeader.replace("Bearer ", "");
+
         return ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_JSON)
-                .body(convertUserToUserDTO(userService.updateUserById(id, saveUserDTO)));
+                .body(convertUserToUserDTO(userService.updateUserById(id, saveUserDTO, jwtToken)));
     }
 
     @DeleteMapping(path = "${application.endpoint.users.id}")
-    public ResponseEntity<HttpStatus> deleteUser(@PathVariable("id") Long id) {
-        userService.deleteUserById(id);
+    public ResponseEntity<HttpStatus> deleteUser(@RequestHeader("Authorization") String authorizationHeader,
+                                                 @PathVariable("id") Long id) {
+        String jwtToken = authorizationHeader.replace("Bearer ", "");
+        userService.deleteUserById(id, jwtToken);
 
         return ResponseEntity.ok(HttpStatus.OK);
     }

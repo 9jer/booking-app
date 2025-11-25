@@ -5,7 +5,6 @@ import com.example.userservice.dto.UserDTO;
 import com.example.userservice.dto.UsersResponse;
 import com.example.userservice.models.User;
 import com.example.userservice.services.UserService;
-import com.example.userservice.util.ErrorResponse;
 import com.example.userservice.util.UserException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -48,6 +47,7 @@ class UserControllerTest {
     private User user;
     private UserDTO userDTO;
     private SaveUserDTO saveUserDTO;
+    private String authHeader = "Bearer token";
 
     @BeforeEach
     void setUp() {
@@ -130,11 +130,11 @@ class UserControllerTest {
     void updateUser_ValidRequest_ReturnsUpdatedUser() {
         // Given
         when(bindingResult.hasErrors()).thenReturn(false);
-        when(userService.updateUserById(anyLong(), any(SaveUserDTO.class))).thenReturn(user);
+        when(userService.updateUserById(anyLong(), any(SaveUserDTO.class), anyString())).thenReturn(user);
         when(modelMapper.map(any(User.class), eq(UserDTO.class))).thenReturn(userDTO);
 
         // When
-        ResponseEntity<UserDTO> response = userController.updateUser(1L, saveUserDTO, bindingResult);
+        ResponseEntity<UserDTO> response = userController.updateUser(authHeader, 1L, saveUserDTO, bindingResult);
 
         // Then
         assertEquals(HttpStatus.OK, response.getStatusCode());
@@ -142,7 +142,7 @@ class UserControllerTest {
         assertNotNull(response.getBody());
         assertEquals(userDTO, response.getBody());
 
-        verify(userService, times(1)).updateUserById(1L, saveUserDTO);
+        verify(userService, times(1)).updateUserById(1L, saveUserDTO, "token");
         verify(modelMapper, times(1)).map(any(User.class), eq(UserDTO.class));
     }
 
@@ -153,23 +153,23 @@ class UserControllerTest {
 
         // When & Then
         assertThrows(UserException.class,
-                () -> userController.updateUser(1L, saveUserDTO, bindingResult));
+                () -> userController.updateUser(authHeader, 1L, saveUserDTO, bindingResult));
 
         verify(bindingResult, times(1)).hasErrors();
-        verify(userService, never()).updateUserById(anyLong(), any(SaveUserDTO.class));
+        verify(userService, never()).updateUserById(anyLong(), any(SaveUserDTO.class), anyString());
     }
 
     @Test
     void deleteUser_ValidId_ReturnsOkStatus() {
         // Given
-        doNothing().when(userService).deleteUserById(1L);
+        doNothing().when(userService).deleteUserById(anyLong(), anyString());
 
         // When
-        ResponseEntity<HttpStatus> response = userController.deleteUser(1L);
+        ResponseEntity<HttpStatus> response = userController.deleteUser(authHeader, 1L);
 
         // Then
         assertEquals(HttpStatus.OK, response.getStatusCode());
-        verify(userService, times(1)).deleteUserById(1L);
+        verify(userService, times(1)).deleteUserById(1L, "token");
     }
 
     @Test

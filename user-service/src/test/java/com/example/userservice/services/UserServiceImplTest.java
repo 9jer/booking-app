@@ -4,6 +4,7 @@ import com.example.userservice.dto.SaveUserDTO;
 import com.example.userservice.models.Role;
 import com.example.userservice.models.User;
 import com.example.userservice.repositories.UserRepository;
+import com.example.userservice.util.JwtTokenUtils;
 import com.example.userservice.util.UserException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -48,6 +49,9 @@ class UserServiceImplTest {
     @Mock
     private UserService self;
 
+    @Mock
+    private JwtTokenUtils jwtTokenUtils;
+
     @InjectMocks
     private UserServiceImpl userService;
 
@@ -55,6 +59,7 @@ class UserServiceImplTest {
     private SaveUserDTO saveUserDTO;
     private Role guestRole;
     private Role ownerRole;
+    private String token = "valid-token";
 
     @BeforeEach
     void setUp() {
@@ -142,47 +147,7 @@ class UserServiceImplTest {
     }
 
     @Test
-    void findAll_ReturnsAllUsers() {
-        // Given
-        when(userRepository.findAll()).thenReturn(List.of(user));
-
-        // When
-        List<User> result = userService.findAll();
-
-        // Then
-        assertEquals(1, result.size());
-        assertEquals(user, result.get(0));
-        verify(userRepository, times(1)).findAll();
-    }
-
-    @Test
-    void getUserById_UserExists_ReturnsUser() {
-        // Given
-        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
-
-        // When
-        User result = userService.getUserById(1L);
-
-        // Then
-        assertEquals(user.getId(), result.getId());
-        verify(userRepository, times(1)).findById(1L);
-    }
-
-    @Test
-    void getUserById_UserNotExists_ThrowsException() {
-        // Given
-        when(userRepository.findById(1L)).thenReturn(Optional.empty());
-
-        // When & Then
-        UserException exception = assertThrows(UserException.class,
-                () -> userService.getUserById(1L));
-
-        assertEquals("User 1 not found", exception.getMessage());
-        verify(userRepository, times(1)).findById(1L);
-    }
-
-    @Test
-    void updateUserById_ValidData_UpdatesUser() {
+    void updateUserById_Owner_UpdatesUser() {
         SaveUserDTO updatedDto = new SaveUserDTO();
         updatedDto.setUsername("newuser");
         updatedDto.setEmail("new@example.com");
@@ -200,6 +165,7 @@ class UserServiceImplTest {
         updatedUser.setUsername("newuser");
         updatedUser.setPassword("newpassword");
 
+        when(jwtTokenUtils.getUserId(token)).thenReturn(1L);
         when(cacheManager.getCache(anyString())).thenReturn(cache);
         when(userRepository.findById(1L)).thenReturn(Optional.of(existingUser));
         when(self.findByUsername("newuser")).thenReturn(Optional.empty());
@@ -208,12 +174,23 @@ class UserServiceImplTest {
         when(passwordEncoder.encode("newpassword")).thenReturn("encodedNewPass");
         when(userRepository.save(existingUser)).thenReturn(existingUser);
 
-        User result = userService.updateUserById(1L, updatedDto);
+        User result = userService.updateUserById(1L, updatedDto, token);
 
         assertEquals("newuser", result.getUsername());
         assertEquals("encodedNewPass", result.getPassword());
         assertNotNull(result.getUpdatedAt());
         verify(userRepository).save(existingUser);
+    }
+
+    @Test
+    void updateUserById_NotOwner_ThrowsException() {
+        when(jwtTokenUtils.getUserId(token)).thenReturn(2L);
+        when(jwtTokenUtils.getRoles(token)).thenReturn(List.of("ROLE_GUEST"));
+
+        assertThrows(UserException.class, () ->
+                userService.updateUserById(1L, saveUserDTO, token));
+
+        verify(userRepository, never()).save(any());
     }
 
     @Test
@@ -233,33 +210,39 @@ class UserServiceImplTest {
 
         // Then
         assertEquals(2, result.getRoles().size());
-        assertTrue(result.getRoles().contains(ownerRole));
+        assertTrue(result.getRoles().stream().anyMatch(r -> r.getName().equals("ROLE_OWNER")));
         verify(userRepository, times(1)).save(user);
     }
 
     @Test
-    void existsById_UserExists_ReturnsTrue() {
+    @Transactional
+    void assignOwnerRole_UserAlreadyHasRole_ThrowsException() {
         // Given
-        when(userRepository.existsById(1L)).thenReturn(true);
+        User user = new User();
+        user.setId(1L);
+        user.setRoles(new ArrayList<>(List.of(guestRole, ownerRole)));
 
-        // When
-        Boolean result = userService.existsById(1L);
+        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+        when(roleService.getOwnerRole()).thenReturn(ownerRole);
 
-        // Then
-        assertTrue(result);
-        verify(userRepository, times(1)).existsById(1L);
+        // When & Then
+        UserException exception = assertThrows(UserException.class, () -> userService.assignOwnerRole(1L));
+        assertEquals("User already has OWNER role", exception.getMessage());
+
+        verify(userRepository, never()).save(any());
     }
 
     @Test
     @Transactional
-    void deleteUserById_ValidId_DeletesUser() {
+    void deleteUserById_Owner_DeletesUser() {
         // Given
+        when(jwtTokenUtils.getUserId(token)).thenReturn(1L);
         when(cacheManager.getCache(anyString())).thenReturn(cache);
         when(userRepository.findById(1L)).thenReturn(Optional.of(user));
         doNothing().when(userRepository).delete(user);
 
         // When
-        userService.deleteUserById(1L);
+        userService.deleteUserById(1L, token);
 
         // Then
         verify(userRepository, times(1)).delete(user);

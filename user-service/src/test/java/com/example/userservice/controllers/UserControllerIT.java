@@ -122,11 +122,12 @@ class UserControllerIT {
 
     @Test
     void updateUser_WithValidData_ShouldReturnUpdatedUser() throws Exception {
-        Mockito.when(userService.updateUserById(anyLong(), any(SaveUserDTO.class)))
+        Mockito.when(userService.updateUserById(anyLong(), any(SaveUserDTO.class), anyString()))
                 .thenReturn(testUser);
         Mockito.when(modelMapper.map(testUser, UserDTO.class)).thenReturn(testUserDTO);
 
         mockMvc.perform(patch(USERS_ID_ENDPOINT, 1L)
+                        .header("Authorization", "Bearer " + validToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(testSaveUserDTO)))
                 .andExpect(status().isOk())
@@ -139,6 +140,7 @@ class UserControllerIT {
         invalidUserDTO.setUsername("");
 
         mockMvc.perform(patch(USERS_ID_ENDPOINT, 1L)
+                        .header("Authorization", "Bearer " + validToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(invalidUserDTO)))
                 .andExpect(status().isBadRequest());
@@ -146,7 +148,10 @@ class UserControllerIT {
 
     @Test
     void deleteUser_ShouldReturnOkStatus() throws Exception {
-        mockMvc.perform(delete(USERS_ID_ENDPOINT, 1L))
+        Mockito.doNothing().when(userService).deleteUserById(anyLong(), anyString());
+
+        mockMvc.perform(delete(USERS_ID_ENDPOINT, 1L)
+                        .header("Authorization", "Bearer " + validToken))
                 .andExpect(status().isOk());
     }
 
@@ -181,10 +186,11 @@ class UserControllerIT {
 
     @Test
     void updateUser_WhenUserNotFound_ShouldReturnNotFound() throws Exception {
-        Mockito.when(userService.updateUserById(anyLong(), any(SaveUserDTO.class)))
+        Mockito.when(userService.updateUserById(anyLong(), any(SaveUserDTO.class), anyString()))
                 .thenThrow(new UserException("User not found"));
 
         mockMvc.perform(patch(USERS_ID_ENDPOINT, 999L)
+                        .header("Authorization", "Bearer " + validToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(testSaveUserDTO)))
                 .andExpect(status().isBadRequest())

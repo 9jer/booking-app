@@ -13,8 +13,8 @@ public interface UserService {
     User createNewUser(User user);
     List<User> findAll();
     User getUserById(Long id);
-    User updateUserById(Long id, SaveUserDTO updatedUser);
+    User updateUserById(Long id, SaveUserDTO updatedUser, String token);
     User assignOwnerRole(Long userId);
     Boolean existsById(Long id);
-    void deleteUserById(Long id);
+    void deleteUserById(Long id, String token);
 }
