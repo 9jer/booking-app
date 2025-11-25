@@ -17,6 +17,6 @@ public interface PropertyService {
     List<Property> search(String location, BigDecimal minPrice, BigDecimal maxPrice);
     Property updateAverageRating(Long propertyId, Double averageRating, Long totalReviews);
     Boolean existsById(Long id);
-    void delete(Long id);
+    void delete(Long id, String token);
 
 }

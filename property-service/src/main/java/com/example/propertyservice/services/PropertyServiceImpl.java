@@ -87,13 +87,11 @@ public class PropertyServiceImpl implements PropertyService {
         Property existingProperty = propertyRepository.findById(id).orElseThrow(()->
                 new PropertyException("Property not found"));
 
-        updatedProperty.setOwnerId(jwtTokenUtils.getUserId(token));
+        Long currentUserId = jwtTokenUtils.getUserId(token);
+        List<String> roles = jwtTokenUtils.getRoles(token);
 
-        Boolean userExists = userClient.userExists(updatedProperty.getOwnerId());
-
-        if (userExists == null || !userExists) {
-            throw new PropertyException("User with id " + updatedProperty.getOwnerId()
-                    + " not found.");
+        if (!roles.contains("ROLE_ADMIN") && !existingProperty.getOwnerId().equals(currentUserId)) {
+            throw new PropertyException("You can only update your own properties.");
         }
 
         enrichPropertyForUpdate(existingProperty, updatedProperty);
@@ -103,7 +101,6 @@ public class PropertyServiceImpl implements PropertyService {
     }
 
     private void enrichPropertyForUpdate(Property existingProperty, Property updatedProperty) {
-        existingProperty.setOwnerId(updatedProperty.getOwnerId());
         existingProperty.setTitle(updatedProperty.getTitle());
         existingProperty.setDescription(updatedProperty.getDescription());
         existingProperty.setLocation(updatedProperty.getLocation());
@@ -158,9 +155,17 @@ public class PropertyServiceImpl implements PropertyService {
     @Override
     @Transactional
     @CacheEvict(value = "property", key = "#id")
-    public void delete(Long id) {
+    public void delete(Long id, String token) {
         Property property = propertyRepository.findById(id).orElseThrow(()->
                 new PropertyException("Property not found"));
+
+        Long currentUserId = jwtTokenUtils.getUserId(token);
+        List<String> roles = jwtTokenUtils.getRoles(token);
+
+        if (!roles.contains("ROLE_ADMIN") && !property.getOwnerId().equals(currentUserId)) {
+            throw new PropertyException("You can only delete your own properties.");
+        }
+
         propertyRepository.delete(property);
     }
 

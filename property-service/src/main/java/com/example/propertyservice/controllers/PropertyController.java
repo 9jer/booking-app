@@ -68,8 +68,10 @@ public class PropertyController {
     }
 
     @DeleteMapping(path = "${application.endpoint.id}")
-    public ResponseEntity<HttpStatus> deleteProperty(@PathVariable("id") Long id) {
-        propertyService.delete(id);
+    public ResponseEntity<HttpStatus> deleteProperty(@PathVariable("id") Long id,
+                                                     @RequestHeader("Authorization") String authorizationHeader) {
+        String jwtToken = authorizationHeader.replace("Bearer ", "");
+        propertyService.delete(id, jwtToken);
 
         return ResponseEntity.ok(HttpStatus.OK);
     }

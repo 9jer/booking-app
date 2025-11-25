@@ -44,6 +44,7 @@ class PropertyControllerTest {
     private Property property;
     private PropertyDTO propertyDTO;
     private GetPropertyDTO getPropertyDTO;
+    private String authHeader = "Bearer token";
 
     @BeforeEach
     void setUp() {
@@ -76,7 +77,6 @@ class PropertyControllerTest {
     @Test
     void createProperty_ValidRequest_ReturnsGetPropertyDTO() {
         // Given
-        String authHeader = "Bearer token";
         when(bindingResult.hasErrors()).thenReturn(false);
         when(modelMapper.map(any(PropertyDTO.class), eq(Property.class))).thenReturn(property);
         when(propertyService.save(any(Property.class), anyString())).thenReturn(property);
@@ -99,7 +99,6 @@ class PropertyControllerTest {
     @Test
     void createProperty_InvalidRequest_ThrowsPropertyException() {
         // Given
-        String authHeader = "Bearer token";
         when(bindingResult.hasErrors()).thenReturn(true);
 
         // When & Then
@@ -113,7 +112,6 @@ class PropertyControllerTest {
     @Test
     void updateProperty_ValidRequest_ReturnsUpdatedGetPropertyDTO() {
         // Given
-        String authHeader = "Bearer token";
         when(bindingResult.hasErrors()).thenReturn(false);
         when(modelMapper.map(any(PropertyDTO.class), eq(Property.class))).thenReturn(property);
         when(propertyService.updatePropertyById(anyLong(), any(Property.class), anyString())).thenReturn(property);
@@ -135,14 +133,14 @@ class PropertyControllerTest {
     @Test
     void deleteProperty_ValidId_ReturnsOkStatus() {
         // Given
-        doNothing().when(propertyService).delete(anyLong());
+        doNothing().when(propertyService).delete(anyLong(), anyString());
 
         // When
-        ResponseEntity<HttpStatus> response = propertyController.deleteProperty(1L);
+        ResponseEntity<HttpStatus> response = propertyController.deleteProperty(1L, authHeader);
 
         // Then
         assertEquals(HttpStatus.OK, response.getStatusCode());
-        verify(propertyService, times(1)).delete(1L);
+        verify(propertyService, times(1)).delete(1L, "token");
     }
 
     @Test

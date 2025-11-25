@@ -92,7 +92,6 @@ class PropertyControllerIT {
 
     @Test
     void createProperty_WithValidData_ShouldReturnCreatedPropertyDTO() throws Exception {
-        // Mock Service
         Mockito.when(propertyService.save(any(Property.class), anyString()))
                 .thenReturn(testProperty);
         Mockito.when(modelMapper.map(any(PropertyDTO.class), eq(Property.class))).thenReturn(testProperty);
@@ -148,13 +147,14 @@ class PropertyControllerIT {
 
     @Test
     void deleteProperty_ShouldReturnOkStatus() throws Exception {
-        mockMvc.perform(delete(ID_ENDPOINT, 1L))
+        mockMvc.perform(delete(ID_ENDPOINT, 1L)
+                        .header("Authorization", "Bearer " + validToken))
                 .andExpect(status().isOk());
     }
 
     @Test
     void searchProperties_ShouldReturnFilteredProperties() throws Exception {
-        Mockito.when(propertyService.search(anyString(), any(), any()))
+        Mockito.when(propertyService.search(any(), any(), any()))
                 .thenReturn(List.of(testProperty));
         Mockito.when(modelMapper.map(testProperty, GetPropertyDTO.class)).thenReturn(testGetPropertyDTO);
 

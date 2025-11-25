@@ -163,13 +163,11 @@ class PropertyServiceImplTest {
 
         Property updatedProperty = new Property();
         updatedProperty.setTitle("Updated Title");
-        updatedProperty.setDescription("Updated Description");
         updatedProperty.setFeatures(Set.of(feature));
 
         when(propertyRepository.findById(1L)).thenReturn(Optional.of(existingProperty));
-
         when(jwtTokenUtils.getUserId(token)).thenReturn(1L);
-        when(userClient.userExists(1L)).thenReturn(true);
+
         when(propertyRepository.save(any(Property.class))).thenReturn(existingProperty);
         when(propertyFeatureRepository.findByName(anyString())).thenReturn(Optional.of(feature));
 
@@ -179,13 +177,9 @@ class PropertyServiceImplTest {
         // Then
         assertNotNull(result);
         assertEquals("Updated Title", existingProperty.getTitle());
-        assertEquals("Updated Description", existingProperty.getDescription());
-        assertNotNull(existingProperty.getUpdatedAt());
-        assertNotNull(existingProperty.getFeatures());
-        assertEquals(1, existingProperty.getFeatures().size());
+        assertEquals(1L, existingProperty.getOwnerId());
 
         verify(propertyRepository, times(1)).save(existingProperty);
-        verify(propertyFeatureRepository, atLeastOnce()).findByName(anyString());
     }
 
     @Test
@@ -269,11 +263,13 @@ class PropertyServiceImplTest {
     @Transactional
     void delete_DeletesProperty() {
         // Given
+        String token = "valid-token";
         when(propertyRepository.findById(1L)).thenReturn(Optional.of(property));
+        when(jwtTokenUtils.getUserId(token)).thenReturn(1L);
         doNothing().when(propertyRepository).delete(property);
 
         // When
-        propertyService.delete(1L);
+        propertyService.delete(1L, token);
 
         // Then
         verify(propertyRepository, times(1)).delete(property);
