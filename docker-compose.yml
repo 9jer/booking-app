@@ -22,6 +22,7 @@ services:
     environment:
       - SPRING_PROFILES_ACTIVE=docker
       - LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_SECURITY=TRACE
+      - JWT_SECRET=${JWT_SECRET}
     volumes:
       - ./api-gateway/src/main/resources/application-docker.yml:/application-docker.yml
     restart: unless-stopped
@@ -37,6 +38,8 @@ services:
       - kafka
     environment:
       - SPRING_PROFILES_ACTIVE=docker
+      - MAIL_USERNAME=${MAIL_USERNAME}
+      - MAIL_PASSWORD=${MAIL_PASSWORD}
     volumes:
       - ./notification-service/src/main/resources/application-docker.yml:/application-docker.yml
     restart: on-failure
@@ -54,6 +57,9 @@ services:
     environment:
       - SPRING_PROFILES_ACTIVE=docker
       - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres-booking:5432/booking_service_db
+      - SPRING_DATASOURCE_USERNAME=${POSTGRES_USER}
+      - SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD}
+      - JWT_SECRET=${JWT_SECRET}
     volumes:
       - ./booking-service/src/main/resources/application-docker.yml:/application-docker.yml
     restart: on-failure
@@ -63,8 +69,8 @@ services:
     #container_name: postgres-booking
     environment:
       POSTGRES_DB: booking_service_db
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     ports:
       - "5433:5432"
     volumes:
@@ -85,6 +91,9 @@ services:
     environment:
       - SPRING_PROFILES_ACTIVE=docker
       - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres-property:5432/property_service_db
+      - SPRING_DATASOURCE_USERNAME=${POSTGRES_USER}
+      - SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD}
+      - JWT_SECRET=${JWT_SECRET}
     volumes:
       - ./property-service/src/main/resources/application-docker.yml:/application-docker.yml
     restart: on-failure
@@ -94,8 +103,8 @@ services:
     #container_name: postgres-property
     environment:
       POSTGRES_DB: property_service_db
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     ports:
       - "5434:5432"
     volumes:
@@ -116,6 +125,9 @@ services:
     environment:
       - SPRING_PROFILES_ACTIVE=docker
       - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres-review:5432/review_service_db
+      - SPRING_DATASOURCE_USERNAME=${POSTGRES_USER}
+      - SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD}
+      - JWT_SECRET=${JWT_SECRET}
     volumes:
       - ./review-service/src/main/resources/application-docker.yml:/application-docker.yml
     restart: on-failure
@@ -125,8 +137,8 @@ services:
     #container_name: postgres-review
     environment:
       POSTGRES_DB: review_service_db
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     ports:
       - "5435:5432"
     volumes:
@@ -147,6 +159,9 @@ services:
     environment:
       - SPRING_PROFILES_ACTIVE=docker
       - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres-user:5432/user_service_db
+      - SPRING_DATASOURCE_USERNAME=${POSTGRES_USER}
+      - SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD}
+      - JWT_SECRET=${JWT_SECRET}
     volumes:
       - ./user-service/src/main/resources/application-docker.yml:/application-docker.yml
     restart: on-failure
@@ -156,8 +171,8 @@ services:
     #container_name: postgres-user
     environment:
       POSTGRES_DB: user_service_db
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     ports:
       - "5436:5432"
     volumes:
