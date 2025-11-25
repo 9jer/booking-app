@@ -61,14 +61,6 @@ public class ReviewServiceImpl implements ReviewService {
                     " until you've lived there.");
         }
 
-        boolean alreadyReview = reviewRepository.existsByUserIdAndPropertyId(
-                review.getUserId(), review.getPropertyId()
-        );
-
-        if (alreadyReview) {
-            throw new ReviewException("You have already reviewed this property!");
-        }
-
         enrichReview(review);
         Review savedReview = reviewRepository.save(review);
 
@@ -83,11 +75,12 @@ public class ReviewServiceImpl implements ReviewService {
     public Review updateReview(Review review, String token) {
 
         Long userId = jwtTokenUtils.getUserId(token);
+        List<String> roles = jwtTokenUtils.getRoles(token);
 
         Review existingReview = reviewRepository.findById(review.getId()).orElseThrow(
                 () -> new ReviewException("Review with id " + review.getId() + " not found."));
 
-        if(!existingReview.getUserId().equals(userId)) {
+        if (!roles.contains("ROLE_ADMIN") && !existingReview.getUserId().equals(userId)) {
             throw new ReviewException("You can only update your own reviews");
         }
 
@@ -111,11 +104,12 @@ public class ReviewServiceImpl implements ReviewService {
     @CacheEvict(value = "reviewsByProperty", key = "#result.propertyId")
     public Review deleteReview(Long reviewId, String token) {
         Long userId = jwtTokenUtils.getUserId(token);
+        List<String> roles = jwtTokenUtils.getRoles(token);
 
         Review existingReview = reviewRepository.findById(reviewId).orElseThrow(
                 () -> new ReviewException("Review with id " + reviewId + " not found."));
 
-        if (!existingReview.getUserId().equals(userId)) {
+        if (!roles.contains("ROLE_ADMIN") && !existingReview.getUserId().equals(userId)) {
             throw new ReviewException("You can only delete your own reviews");
         }
 

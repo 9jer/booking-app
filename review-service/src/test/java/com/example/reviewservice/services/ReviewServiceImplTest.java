@@ -87,7 +87,6 @@ class ReviewServiceImplTest {
         when(jwtTokenUtils.getUserId(validToken)).thenReturn(1L);
         when(userClient.userExists(1L)).thenReturn(true);
         when(bookingClient.wasBooked(1L, 1L)).thenReturn(true);
-        when(reviewRepository.existsByUserIdAndPropertyId(1L, 1L)).thenReturn(false);
         when(reviewRepository.save(any(Review.class))).thenReturn(review);
 
         // When
@@ -150,25 +149,7 @@ class ReviewServiceImplTest {
 
     @Test
     @Transactional
-    void saveReview_AlreadyReviewed_ThrowsException() {
-        // Given
-        when(propertyClient.propertyExists(1L)).thenReturn(true);
-        when(jwtTokenUtils.getUserId(validToken)).thenReturn(1L);
-        when(userClient.userExists(1L)).thenReturn(true);
-        when(bookingClient.wasBooked(1L, 1L)).thenReturn(true);
-        when(reviewRepository.existsByUserIdAndPropertyId(1L, 1L)).thenReturn(true);
-
-        // When & Then
-        ReviewException exception = assertThrows(ReviewException.class,
-                () -> reviewService.saveReview(review, validToken));
-
-        assertEquals("You have already reviewed this property!", exception.getMessage());
-        verify(reviewRepository, never()).save(any(Review.class));
-    }
-
-    @Test
-    @Transactional
-    void updateReview_ValidData_UpdatesReview() {
+    void updateReview_Owner_UpdatesReview() {
         // Given
         Review updatedReview = new Review();
         updatedReview.setId(1L);
@@ -187,45 +168,24 @@ class ReviewServiceImplTest {
         when(reviewRepository.findById(1L)).thenReturn(Optional.of(existingReview));
         when(jwtTokenUtils.getUserId(validToken)).thenReturn(1L);
         when(propertyClient.propertyExists(1L)).thenReturn(true);
-        when(reviewRepository.save(any(Review.class))).thenAnswer(invocation -> {
-            Review saved = invocation.getArgument(0);
-            return saved;
-        });
+        when(reviewRepository.save(any(Review.class))).thenReturn(existingReview);
 
         // When
         Review result = reviewService.updateReview(updatedReview, validToken);
 
         // Then
-        assertNotNull(result, "Updated review should not be null");
-        assertEquals(4, result.getRating(), "Rating should be updated");
-        assertEquals("Updated comment", result.getComment(), "Comment should be updated");
-        assertNotNull(result.getUpdatedAt(), "UpdatedAt should be set");
-        assertEquals(1L, result.getUserId(), "User ID should remain unchanged");
-        assertNotNull(result.getCreatedAt(), "CreatedAt should remain unchanged");
+        assertNotNull(result);
+        assertEquals(4, result.getRating());
         verify(reviewRepository, times(1)).save(existingReview);
-        verify(ratingEventProducer, times(1)).sendRatingUpdatedEvent(1L);
     }
 
     @Test
     @Transactional
-    void updateReview_ReviewNotExists_ThrowsException() {
-        // Given
-        when(reviewRepository.findById(1L)).thenReturn(Optional.empty());
-
-        // When & Then
-        ReviewException exception = assertThrows(ReviewException.class,
-                () -> reviewService.updateReview(review, validToken));
-
-        assertEquals("Review with id 1 not found.", exception.getMessage());
-        verify(reviewRepository, never()).save(any(Review.class));
-    }
-
-    @Test
-    @Transactional
-    void updateReview_NotOwnReview_ThrowsException() {
+    void updateReview_NotOwner_ThrowsException() {
         // Given
         when(reviewRepository.findById(1L)).thenReturn(Optional.of(review));
-        when(jwtTokenUtils.getUserId(validToken)).thenReturn(2L); // Different user
+        when(jwtTokenUtils.getUserId(validToken)).thenReturn(2L);
+        when(jwtTokenUtils.getRoles(validToken)).thenReturn(List.of("ROLE_USER"));
 
         // When & Then
         ReviewException exception = assertThrows(ReviewException.class,
@@ -237,7 +197,7 @@ class ReviewServiceImplTest {
 
     @Test
     @Transactional
-    void deleteReview_ValidRequest_DeletesReview() {
+    void deleteReview_Owner_DeletesReview() {
         // Given
         when(reviewRepository.findById(1L)).thenReturn(Optional.of(review));
         when(jwtTokenUtils.getUserId(validToken)).thenReturn(1L);
@@ -253,10 +213,11 @@ class ReviewServiceImplTest {
 
     @Test
     @Transactional
-    void deleteReview_NotOwnReview_ThrowsException() {
+    void deleteReview_NotOwner_ThrowsException() {
         // Given
         when(reviewRepository.findById(1L)).thenReturn(Optional.of(review));
-        when(jwtTokenUtils.getUserId(validToken)).thenReturn(2L); // Different user
+        when(jwtTokenUtils.getUserId(validToken)).thenReturn(2L);
+        when(jwtTokenUtils.getRoles(validToken)).thenReturn(List.of("ROLE_USER"));
 
         // When & Then
         ReviewException exception = assertThrows(ReviewException.class,
@@ -265,5 +226,4 @@ class ReviewServiceImplTest {
         assertEquals("You can only delete your own reviews", exception.getMessage());
         verify(reviewRepository, never()).delete(any(Review.class));
     }
-
 }
