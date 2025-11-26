@@ -1,12 +1,13 @@
 package com.example.reviewservice.services;
 
+import com.example.reviewservice.dto.GetReviewDTO;
 import com.example.reviewservice.models.Review;
 
 import java.util.List;
 
 public interface ReviewService {
-    List<Review> getReviewsByPropertyId(Long propertyId);
-    Review saveReview(Review review, String token);
-    Review updateReview(Review review, String token);
-    Review deleteReview(Long reviewId, String token);
+    List<GetReviewDTO> getReviewsByPropertyId(Long propertyId);
+    GetReviewDTO saveReview(Review review, String token);
+    GetReviewDTO updateReview(Review review, String token);
+    GetReviewDTO deleteReview(Long reviewId, String token);
 }

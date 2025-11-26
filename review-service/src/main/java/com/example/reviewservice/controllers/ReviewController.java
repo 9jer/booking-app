@@ -16,8 +16,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.stream.Collectors;
-
 @RestController
 @RequestMapping("${application.endpoint.root}")
 @RequiredArgsConstructor
@@ -29,26 +27,23 @@ public class ReviewController {
     public ResponseEntity<ReviewsResponse> getReviewsByPropertyId(@PathVariable Long id) {
         return ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_JSON)
-                .body(new ReviewsResponse(reviewService.getReviewsByPropertyId(id).stream()
-                        .map(this::convertReviewToGetReviewDTO).collect(Collectors.toList())));
+                .body(new ReviewsResponse(reviewService.getReviewsByPropertyId(id)));
     }
 
     @PostMapping
     public ResponseEntity<GetReviewDTO> createReview(@RequestHeader("Authorization") String authorizationHeader,
-            @RequestBody @Valid ReviewDTO reviewDTO, BindingResult bindingResult) {
-        Review review = convertReviewDTOToReview(reviewDTO);
+                                                     @RequestBody @Valid ReviewDTO reviewDTO, BindingResult bindingResult) {
 
         if(bindingResult.hasErrors()) {
             ErrorsUtil.returnAllErrors(bindingResult);
         }
 
+        Review review = convertReviewDTOToReview(reviewDTO);
         String jwtToken = authorizationHeader.replace("Bearer ", "");
-
-        Review savedReview = reviewService.saveReview(review, jwtToken);
 
         return ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_JSON)
-                .body(convertReviewToGetReviewDTO(savedReview));
+                .body(reviewService.saveReview(review, jwtToken));
     }
 
     @PutMapping("/{id}")
@@ -63,11 +58,9 @@ public class ReviewController {
         Review review = convertReviewDTOToReview(reviewDTO);
         review.setId(id);
 
-        Review updatedReview = reviewService.updateReview(review, jwtToken);
-
         return ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_JSON)
-                .body(convertReviewToGetReviewDTO(updatedReview));
+                .body(reviewService.updateReview(review, jwtToken));
     }
 
     @DeleteMapping("/{id}")
@@ -81,10 +74,6 @@ public class ReviewController {
 
     private Review convertReviewDTOToReview(ReviewDTO reviewDTO) {
         return modelMapper.map(reviewDTO, Review.class);
-    }
-
-    private GetReviewDTO convertReviewToGetReviewDTO(Review review) {
-        return modelMapper.map(review, GetReviewDTO.class);
     }
 
     @ExceptionHandler

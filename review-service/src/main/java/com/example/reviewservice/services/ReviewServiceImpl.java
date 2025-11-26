@@ -3,12 +3,14 @@ package com.example.reviewservice.services;
 import com.example.reviewservice.client.BookingClient;
 import com.example.reviewservice.client.PropertyClient;
 import com.example.reviewservice.client.UserClient;
+import com.example.reviewservice.dto.GetReviewDTO;
 import com.example.reviewservice.event.RatingEventProducer;
 import com.example.reviewservice.models.Review;
 import com.example.reviewservice.repositories.ReviewRepository;
 import com.example.reviewservice.util.JwtTokenUtils;
 import com.example.reviewservice.util.ReviewException;
 import lombok.RequiredArgsConstructor;
+import org.modelmapper.ModelMapper;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
@@ -16,6 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 @Transactional(readOnly = true)
@@ -27,36 +30,35 @@ public class ReviewServiceImpl implements ReviewService {
     private final BookingClient bookingClient;
     private final JwtTokenUtils jwtTokenUtils;
     private final RatingEventProducer ratingEventProducer;
+    private final ModelMapper modelMapper;
 
     @Override
     @Cacheable(value = "reviewsByProperty", key = "#propertyId")
-    public List<Review> getReviewsByPropertyId(Long propertyId) {
-        return reviewRepository.findByPropertyId(propertyId);
+    public List<GetReviewDTO> getReviewsByPropertyId(Long propertyId) {
+        return reviewRepository.findByPropertyId(propertyId).stream()
+                .map(this::convertToGetReviewDTO)
+                .collect(Collectors.toList());
     }
 
     @Override
     @Transactional
-    @CacheEvict(value = "reviewsByProperty", key = "#review.propertyId")
-    public Review saveReview(Review review, String token) {
+    @CacheEvict(value = "reviewsByProperty", key = "#result.propertyId")
+    public GetReviewDTO saveReview(Review review, String token) {
         review.setId(null);
         Boolean propertyExists = propertyClient.propertyExists(review.getPropertyId());
 
         review.setUserId(jwtTokenUtils.getUserId(token));
         Boolean userExists = userClient.userExists(review.getUserId());
 
+        if (Boolean.FALSE.equals(propertyExists)) {
+            throw new ReviewException("Property with id " + review.getPropertyId() + " not found.");
+        }
+        if (Boolean.FALSE.equals(userExists)) {
+            throw new ReviewException("User with id " + review.getUserId() + " not found.");
+        }
+
         Boolean wasBooked = bookingClient.wasBooked(review.getPropertyId(), review.getUserId());
-
-        if (propertyExists == null || !propertyExists) {
-            throw new ReviewException("Property with id " + review.getPropertyId()
-                    + " not found.");
-        }
-
-        if (userExists == null || !userExists) {
-            throw new ReviewException("User with id " + review.getUserId()
-                    + " not found.");
-        }
-
-        if (wasBooked == null || !wasBooked) {
+        if (Boolean.FALSE.equals(wasBooked)) {
             throw new ReviewException("You can't leave a review on a place " + review.getPropertyId() +
                     " until you've lived there.");
         }
@@ -66,13 +68,13 @@ public class ReviewServiceImpl implements ReviewService {
 
         ratingEventProducer.sendRatingUpdatedEvent(review.getPropertyId());
 
-        return savedReview;
+        return convertToGetReviewDTO(savedReview);
     }
 
     @Override
     @Transactional
-    @CacheEvict(value = "reviewsByProperty", key = "#review.propertyId")
-    public Review updateReview(Review review, String token) {
+    @CacheEvict(value = "reviewsByProperty", key = "#result.propertyId")
+    public GetReviewDTO updateReview(Review review, String token) {
 
         Long userId = jwtTokenUtils.getUserId(token);
         List<String> roles = jwtTokenUtils.getRoles(token);
@@ -84,9 +86,7 @@ public class ReviewServiceImpl implements ReviewService {
             throw new ReviewException("You can only update your own reviews");
         }
 
-        if (!propertyClient.propertyExists(review.getPropertyId())) {
-            throw new ReviewException("Property with id " + review.getPropertyId() + " not found.");
-        }
+        review.setPropertyId(existingReview.getPropertyId());
 
         existingReview.setRating(review.getRating());
         existingReview.setComment(review.getComment());
@@ -94,15 +94,15 @@ public class ReviewServiceImpl implements ReviewService {
 
         Review updatedReview = reviewRepository.save(existingReview);
 
-        ratingEventProducer.sendRatingUpdatedEvent(review.getPropertyId());
+        ratingEventProducer.sendRatingUpdatedEvent(existingReview.getPropertyId());
 
-        return updatedReview;
+        return convertToGetReviewDTO(updatedReview);
     }
 
     @Override
     @Transactional
     @CacheEvict(value = "reviewsByProperty", key = "#result.propertyId")
-    public Review deleteReview(Long reviewId, String token) {
+    public GetReviewDTO deleteReview(Long reviewId, String token) {
         Long userId = jwtTokenUtils.getUserId(token);
         List<String> roles = jwtTokenUtils.getRoles(token);
 
@@ -117,7 +117,8 @@ public class ReviewServiceImpl implements ReviewService {
         reviewRepository.delete(existingReview);
 
         ratingEventProducer.sendRatingUpdatedEvent(propertyId);
-        return existingReview;
+
+        return convertToGetReviewDTO(existingReview);
     }
 
     private void enrichUpdatedReview(Review existingReview) {
@@ -128,4 +129,7 @@ public class ReviewServiceImpl implements ReviewService {
         review.setCreatedAt(LocalDateTime.now());
     }
 
+    private GetReviewDTO convertToGetReviewDTO(Review review) {
+        return modelMapper.map(review, GetReviewDTO.class);
+    }
 }
