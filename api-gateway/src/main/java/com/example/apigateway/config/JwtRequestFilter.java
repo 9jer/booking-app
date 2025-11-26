@@ -33,7 +33,7 @@ public class JwtRequestFilter implements WebFilter {
         String authHeader = exchange.getRequest().getHeaders().getFirst("Authorization");
         String jwtToken = null;
 
-        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+        if (authHeader != null && authHeader.length() >= 7 && authHeader.startsWith("Bearer ")) {
             jwtToken = authHeader.substring(7);
             try {
                 String username = jwtTokenUtils.getUsername(jwtToken);

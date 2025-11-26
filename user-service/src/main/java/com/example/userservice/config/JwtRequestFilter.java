@@ -1,7 +1,6 @@
 package com.example.userservice.config;
 
 import com.example.userservice.util.JwtTokenUtils;
-import io.jsonwebtoken.ExpiredJwtException;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -28,7 +27,7 @@ public class JwtRequestFilter extends OncePerRequestFilter {
         String username = null;
         String jwtToken = null;
 
-        if(authHeader != null && authHeader.startsWith("Bearer ")) {
+        if(authHeader != null && authHeader.length() >= 7 && authHeader.startsWith("Bearer ")) {
             jwtToken = authHeader.substring(7);
             try{
                 username = jwtTokenUtils.getUsername(jwtToken);

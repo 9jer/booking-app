@@ -2,8 +2,10 @@ package com.example.userservice.util;
 
 import com.example.userservice.security.CustomUserDetails;
 import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.JwtParser;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
+import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -26,6 +28,19 @@ public class JwtTokenUtils {
     @Value("${jwt.lifetime}")
     private Duration jwtLifetime;
 
+    private SecretKey signKey;
+    private JwtParser jwtParser;
+
+    @PostConstruct
+    public void init() {
+        byte[] keyBytes = secret.getBytes(StandardCharsets.UTF_8);
+        if (keyBytes.length < 32) {
+            throw new IllegalArgumentException("JWT secret must be at least 32 bytes");
+        }
+        this.signKey = Keys.hmacShaKeyFor(keyBytes);
+        this.jwtParser = Jwts.parser().verifyWith(this.signKey).build();
+    }
+
     public String generateToken(UserDetails userDetails) {
         Map<String, Object> claims = new HashMap<>();
         List<String> roleList = userDetails.getAuthorities().stream()
@@ -38,20 +53,12 @@ public class JwtTokenUtils {
         Date expiredDate = new Date(issuedDate.getTime() + jwtLifetime.toMillis());
 
         return Jwts.builder()
-                .subject(userDetails.getUsername()) // getUsername() = getId()
+                .subject(userDetails.getUsername())
                 .claims(claims)
                 .issuedAt(issuedDate)
                 .expiration(expiredDate)
-                .signWith(getSignKey(), Jwts.SIG.HS256)
+                .signWith(signKey, Jwts.SIG.HS256)
                 .compact();
-    }
-
-    private SecretKey getSignKey() {
-        byte[] keyBytes = secret.getBytes(StandardCharsets.UTF_8);
-        if (keyBytes.length < 32) {
-            throw new IllegalArgumentException("JWT secret must be at least 32 bytes");
-        }
-        return Keys.hmacShaKeyFor(keyBytes);
     }
 
     public String getUsername(String token) {
@@ -71,10 +78,6 @@ public class JwtTokenUtils {
     }
 
     private Claims getClaimsFromToken(String token) {
-        return Jwts.parser()
-                .verifyWith(getSignKey())
-                .build()
-                .parseSignedClaims(token)
-                .getPayload();
+        return jwtParser.parseSignedClaims(token).getPayload();
     }
 }
