@@ -2,12 +2,16 @@ package com.example.propertyservice.services;
 
 import com.example.propertyservice.client.BookingClient;
 import com.example.propertyservice.client.UserClient;
+import com.example.propertyservice.dto.GetPropertyDTO;
+import com.example.propertyservice.dto.PropertyFeatureDTO;
 import com.example.propertyservice.models.Property;
 import com.example.propertyservice.models.PropertyFeature;
 import com.example.propertyservice.repositories.PropertyFeatureRepository;
 import com.example.propertyservice.repositories.PropertyRepository;
 import com.example.propertyservice.util.JwtTokenUtils;
 import com.example.propertyservice.util.PropertyException;
+import lombok.RequiredArgsConstructor;
+import org.modelmapper.ModelMapper;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.CachePut;
 import org.springframework.cache.annotation.Cacheable;
@@ -23,6 +27,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service("propertyServiceImpl")
+@RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class PropertyServiceImpl implements PropertyService {
     private final PropertyRepository propertyRepository;
@@ -30,36 +35,27 @@ public class PropertyServiceImpl implements PropertyService {
     private final BookingClient bookingClient;
     private final UserClient userClient;
     private final JwtTokenUtils jwtTokenUtils;
-
-    public PropertyServiceImpl(PropertyRepository propertyRepository,
-                               PropertyFeatureRepository propertyFeatureRepository,
-                               BookingClient bookingClient,
-                               UserClient userClient,
-                               JwtTokenUtils jwtTokenUtils) {
-        this.propertyRepository = propertyRepository;
-        this.propertyFeatureRepository = propertyFeatureRepository;
-        this.bookingClient = bookingClient;
-        this.userClient = userClient;
-        this.jwtTokenUtils = jwtTokenUtils;
-    }
+    private final ModelMapper modelMapper;
 
     @Override
-    public List<Property> findAll(){
-        return propertyRepository.findAll();
+    public List<GetPropertyDTO> findAll(){
+        return propertyRepository.findAll().stream()
+                .map(this::convertToGetPropertyDTO)
+                .collect(Collectors.toList());
     }
 
     @Override
     @Cacheable(value = "property", key = "#id")
-    public Property getPropertyById(Long id){
+    public GetPropertyDTO getPropertyById(Long id){
         Property property = propertyRepository.findById(id).orElseThrow(()->
                 new PropertyException("Property not found"));
-        return convertToDetachedProperty(property);
+        return convertToGetPropertyDTO(property);
     }
 
     @Override
     @Transactional
     @CachePut(value = "property", key = "#result.id")
-    public Property save(Property property, String token) {
+    public GetPropertyDTO save(Property property, String token) {
         property.setOwnerId(jwtTokenUtils.getUserId(token));
 
         Boolean userExists = userClient.userExists(property.getOwnerId());
@@ -72,7 +68,8 @@ public class PropertyServiceImpl implements PropertyService {
         enrichPropertyForSave(property);
         property.setId(null);
         Property savedProperty = propertyRepository.save(property);
-        return convertToDetachedProperty(savedProperty);
+
+        return convertToGetPropertyDTO(savedProperty);
     }
 
     private void enrichPropertyForSave(Property property) {
@@ -83,7 +80,7 @@ public class PropertyServiceImpl implements PropertyService {
     @Override
     @Transactional
     @CachePut(value = "property", key = "#id")
-    public Property updatePropertyById(Long id, Property updatedProperty, String token) {
+    public GetPropertyDTO updatePropertyById(Long id, Property updatedProperty, String token) {
         Property existingProperty = propertyRepository.findById(id).orElseThrow(()->
                 new PropertyException("Property not found"));
 
@@ -97,7 +94,7 @@ public class PropertyServiceImpl implements PropertyService {
         enrichPropertyForUpdate(existingProperty, updatedProperty);
 
         Property savedProperty = propertyRepository.save(existingProperty);
-        return convertToDetachedProperty(savedProperty);
+        return convertToGetPropertyDTO(savedProperty);
     }
 
     private void enrichPropertyForUpdate(Property existingProperty, Property updatedProperty) {
@@ -126,25 +123,33 @@ public class PropertyServiceImpl implements PropertyService {
     }
 
     @Override
-    public List<Property> search(String location, BigDecimal minPrice, BigDecimal maxPrice) {
-        return propertyRepository.searchProperties(location, minPrice, maxPrice);
+    public List<GetPropertyDTO> search(String location, BigDecimal minPrice, BigDecimal maxPrice) {
+        return propertyRepository.searchProperties(location, minPrice, maxPrice).stream()
+                .map(this::convertToGetPropertyDTO)
+                .collect(Collectors.toList());
     }
 
     private Set<PropertyFeature> findOrCreatePropertyFeature(Property property) {
+        if (property.getFeatures() == null) {
+            return new HashSet<>();
+        }
         return property.getFeatures().stream()
                 .map(feature -> propertyFeatureRepository.findByName(feature.getName())
                         .orElseGet(() -> propertyFeatureRepository.save(feature)))
                 .collect(Collectors.toSet());
     }
 
+    @Override
     @Transactional
     @CachePut(value = "property", key = "#propertyId")
-    public Property updateAverageRating(Long propertyId, Double averageRating, Long totalReviews) {
+    public GetPropertyDTO updateAverageRating(Long propertyId, Double averageRating, Long totalReviews) {
         var property = propertyRepository.findById(propertyId).orElseThrow(()->
                 new PropertyException("Property not found"));
+
         property.setAverageRating(BigDecimal.valueOf(averageRating));
         Property savedProperty = propertyRepository.save(property);
-        return convertToDetachedProperty(savedProperty);
+
+        return convertToGetPropertyDTO(savedProperty);
     }
 
     @Override
@@ -169,25 +174,20 @@ public class PropertyServiceImpl implements PropertyService {
         propertyRepository.delete(property);
     }
 
-    private Property convertToDetachedProperty(Property property) {
-        Property detachedProperty = new Property();
-        detachedProperty.setId(property.getId());
-        detachedProperty.setOwnerId(property.getOwnerId());
-        detachedProperty.setTitle(property.getTitle());
-        detachedProperty.setDescription(property.getDescription());
-        detachedProperty.setLocation(property.getLocation());
-        detachedProperty.setPricePerNight(property.getPricePerNight());
-        detachedProperty.setCapacity(property.getCapacity());
-        detachedProperty.setAverageRating(property.getAverageRating());
-        detachedProperty.setCreatedAt(property.getCreatedAt());
-        detachedProperty.setUpdatedAt(property.getUpdatedAt());
+    private GetPropertyDTO convertToGetPropertyDTO(Property property) {
+        GetPropertyDTO dto = modelMapper.map(property, GetPropertyDTO.class);
 
         if (property.getFeatures() != null) {
-            detachedProperty.setFeatures(new HashSet<>(property.getFeatures()));
-        } else {
-            detachedProperty.setFeatures(new HashSet<>());
+            Set<PropertyFeatureDTO> featureDTOs = property.getFeatures().stream()
+                    .map(f -> {
+                        PropertyFeatureDTO fdto = new PropertyFeatureDTO();
+                        fdto.setName(f.getName());
+                        return fdto;
+                    })
+                    .collect(Collectors.toSet());
+            dto.setFeatures(featureDTOs);
         }
 
-        return detachedProperty;
+        return dto;
     }
 }

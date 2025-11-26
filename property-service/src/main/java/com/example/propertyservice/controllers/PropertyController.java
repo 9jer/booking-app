@@ -21,7 +21,6 @@ import org.springframework.web.bind.annotation.*;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
-import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("${application.endpoint.root}")
@@ -33,38 +32,34 @@ public class PropertyController {
 
     @PostMapping
     public ResponseEntity<GetPropertyDTO> createProperty(@RequestHeader("Authorization") String authorizationHeader,
-                                                   @RequestBody @Valid PropertyDTO propertyDTO, BindingResult bindingResult) {
-        Property property = convertPropertyDTOToProperty(propertyDTO);
-
+                                                         @RequestBody @Valid PropertyDTO propertyDTO, BindingResult bindingResult) {
         if(bindingResult.hasErrors()) {
             ErrorsUtil.returnAllErrors(bindingResult);
         }
 
+        Property property = convertPropertyDTOToProperty(propertyDTO);
         String jwtToken = authorizationHeader.replace("Bearer ", "");
 
-        Property savedProperty = propertyService.save(property, jwtToken);
+        GetPropertyDTO savedProperty = propertyService.save(property, jwtToken);
 
         return ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_JSON)
-                .body(convertPropertyToGetPropertyDTO(savedProperty));
+                .body(savedProperty);
     }
 
     @PatchMapping(path = "${application.endpoint.id}")
     public ResponseEntity<GetPropertyDTO> updateProperty(@RequestHeader("Authorization") String authorizationHeader,
-                                                   @PathVariable("id") Long id, @RequestBody @Valid PropertyDTO propertyDTO, BindingResult bindingResult) {
-        Property property = convertPropertyDTOToProperty(propertyDTO);
-
+                                                         @PathVariable("id") Long id, @RequestBody @Valid PropertyDTO propertyDTO, BindingResult bindingResult) {
         if(bindingResult.hasErrors()) {
             ErrorsUtil.returnAllErrors(bindingResult);
         }
 
+        Property property = convertPropertyDTOToProperty(propertyDTO);
         String jwtToken = authorizationHeader.replace("Bearer ", "");
-
-        Property updatedProperty = propertyService.updatePropertyById(id, property, jwtToken);
 
         return ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_JSON)
-                .body(convertPropertyToGetPropertyDTO(updatedProperty));
+                .body(propertyService.updatePropertyById(id, property, jwtToken));
     }
 
     @DeleteMapping(path = "${application.endpoint.id}")
@@ -80,15 +75,14 @@ public class PropertyController {
     public ResponseEntity<PropertiesResponse> getAllProperties() {
         return ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_JSON)
-                .body(new PropertiesResponse(propertyService.findAll().stream()
-                .map(this::convertPropertyToGetPropertyDTO).collect(Collectors.toList())));
+                .body(new PropertiesResponse(propertyService.findAll()));
     }
 
     @GetMapping(path = "${application.endpoint.id}")
     public ResponseEntity<GetPropertyDTO> getPropertyById(@PathVariable("id") Long id) {
         return ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_JSON)
-                .body(convertPropertyToGetPropertyDTO(propertyService.getPropertyById(id)));
+                .body(propertyService.getPropertyById(id));
     }
 
     @GetMapping(path = "${application.endpoint.search}")
@@ -96,22 +90,19 @@ public class PropertyController {
             @RequestParam(required = false) String location,
             @RequestParam(required = false) BigDecimal minPrice,
             @RequestParam(required = false) BigDecimal maxPrice) {
-        List<Property> properties = propertyService.search(location, minPrice, maxPrice);
 
-        List<GetPropertyDTO> propertyDTOs = properties.stream()
-                .map(this::convertPropertyToGetPropertyDTO)
-                .collect(Collectors.toList());
+        List<GetPropertyDTO> properties = propertyService.search(location, minPrice, maxPrice);
 
         return ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_JSON)
-                .body(new PropertiesResponse(propertyDTOs));
+                .body(new PropertiesResponse(properties));
     }
 
 
     @GetMapping(path = "${application.endpoint.availability}")
     public ResponseEntity<Boolean> checkAvailability(@PathVariable("id") Long id,
-                                     @RequestParam LocalDate checkIn,
-                                     @RequestParam LocalDate checkOut) {
+                                                     @RequestParam LocalDate checkIn,
+                                                     @RequestParam LocalDate checkOut) {
         return ResponseEntity.ok(propertyService.isPropertyAvailable(id, checkIn, checkOut));
     }
 
@@ -130,10 +121,6 @@ public class PropertyController {
 
     private Property convertPropertyDTOToProperty(PropertyDTO propertyDTO) {
         return modelMapper.map(propertyDTO, Property.class);
-    }
-
-    private GetPropertyDTO convertPropertyToGetPropertyDTO(Property property) {
-        return modelMapper.map(property, GetPropertyDTO.class);
     }
 
     @ExceptionHandler
