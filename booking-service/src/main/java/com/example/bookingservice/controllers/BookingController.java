@@ -2,7 +2,6 @@ package com.example.bookingservice.controllers;
 
 import com.example.bookingservice.dto.*;
 import com.example.bookingservice.models.Booking;
-import com.example.bookingservice.models.BookingHistory;
 import com.example.bookingservice.models.BookingStatus;
 import com.example.bookingservice.services.BookingService;
 import com.example.bookingservice.util.BookingErrorResponse;
@@ -20,7 +19,6 @@ import org.springframework.web.bind.annotation.*;
 
 import java.net.URI;
 import java.time.LocalDate;
-import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("${application.endpoint.root}")
@@ -36,8 +34,7 @@ public class BookingController {
         String jwtToken = authorizationHeader.replace("Bearer ", "");
         return ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_JSON)
-                .body(new BookingsResponse(bookingService.getAllBookings(jwtToken).stream()
-                        .map(this::convertBookingToGetBookingDTO).collect(Collectors.toList())));
+                .body(new BookingsResponse(bookingService.getAllBookings(jwtToken)));
     }
 
     @GetMapping(path = "${application.endpoint.id}")
@@ -46,7 +43,7 @@ public class BookingController {
         String jwtToken = authorizationHeader.replace("Bearer ", "");
         return ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_JSON)
-                .body(convertBookingToGetBookingDTO(bookingService.getBookingById(id, jwtToken)));
+                .body(bookingService.getBookingById(id, jwtToken));
     }
 
     @GetMapping("/property/{id}")
@@ -55,16 +52,14 @@ public class BookingController {
         String jwtToken = authorizationHeader.replace("Bearer ", "");
         return ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_JSON)
-                .body(new BookingsResponse(bookingService.getBookingByPropertyId(propertyId, jwtToken).stream()
-                        .map(this::convertBookingToGetBookingDTO).collect(Collectors.toList())));
+                .body(new BookingsResponse(bookingService.getBookingByPropertyId(propertyId, jwtToken)));
     }
 
     @GetMapping(path = "${application.endpoint.booking-history-by-id}")
     public ResponseEntity<BookingHistoryResponse> getBookingHistoryById(@PathVariable("id") Long id){
         return ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_JSON)
-                .body(new BookingHistoryResponse(bookingService.getBookingHistoryByBookingId(id).stream()
-                        .map(this::convertBookingHistoryToBookingHistoryDTO).collect(Collectors.toList())));
+                .body(new BookingHistoryResponse(bookingService.getBookingHistoryByBookingId(id)));
     }
 
     @PostMapping
@@ -78,12 +73,12 @@ public class BookingController {
 
         String jwtToken = authorizationHeader.replace("Bearer ", "");
 
-        Booking createdBooking = bookingService.createBooking(booking, jwtToken);
+        GetBookingDTO createdBooking = bookingService.createBooking(booking, jwtToken);
 
         URI location = URI.create(rootEndpointUri + "/" + createdBooking.getId());
         return ResponseEntity.created(location)
                 .contentType(MediaType.APPLICATION_JSON)
-                .body(convertBookingToGetBookingDTO(createdBooking));
+                .body(createdBooking);
     }
 
     @PatchMapping(path = "${application.endpoint.booking-status}")
@@ -93,11 +88,11 @@ public class BookingController {
             @RequestParam BookingStatus status) {
 
         String jwtToken = authorizationHeader.replace("Bearer ", "");
-        Booking updatedBooking = bookingService.updateBookingStatus(id, status, jwtToken);
+        GetBookingDTO updatedBooking = bookingService.updateBookingStatus(id, status, jwtToken);
 
         return ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_JSON)
-                .body(convertBookingToGetBookingDTO(updatedBooking));
+                .body(updatedBooking);
     }
 
     @GetMapping(path = "${application.endpoint.availability}")
@@ -119,16 +114,8 @@ public class BookingController {
                 .body(new AvailableDatesResponse(bookingService.getAvailableDates(propertyId)));
     }
 
-    private GetBookingDTO convertBookingToGetBookingDTO(Booking booking){
-        return modelMapper.map(booking, GetBookingDTO.class);
-    }
-
     private Booking convertBookingDTOToBooking(BookingDTO bookingDTO){
         return modelMapper.map(bookingDTO, Booking.class);
-    }
-
-    private BookingHistoryDTO convertBookingHistoryToBookingHistoryDTO(BookingHistory bookingHistory){
-        return modelMapper.map(bookingHistory, BookingHistoryDTO.class);
     }
 
     @ExceptionHandler

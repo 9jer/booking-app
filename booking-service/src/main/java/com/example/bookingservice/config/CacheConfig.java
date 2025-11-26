@@ -43,6 +43,9 @@ public class CacheConfig {
         return (builder) -> builder
                 .withCacheConfiguration("availableDates",
                         cacheConfiguration()
-                                .entryTtl(Duration.ofMinutes(10)));
+                                .entryTtl(Duration.ofMinutes(10)))
+                .withCacheConfiguration("bookingById",
+                        cacheConfiguration()
+                                .entryTtl(Duration.ofMinutes(5)));
     }
 }

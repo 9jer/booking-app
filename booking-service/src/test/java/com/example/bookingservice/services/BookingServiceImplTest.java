@@ -2,6 +2,8 @@ package com.example.bookingservice.services;
 
 import com.example.bookingservice.client.PropertyClient;
 import com.example.bookingservice.client.UserClient;
+import com.example.bookingservice.dto.BookingHistoryDTO;
+import com.example.bookingservice.dto.GetBookingDTO;
 import com.example.bookingservice.dto.GetPropertyDTO;
 import com.example.bookingservice.event.BookingCreatedEvent;
 import com.example.bookingservice.event.BookingCreatedEventProducer;
@@ -18,6 +20,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.modelmapper.ModelMapper;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
@@ -32,7 +35,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
-    class BookingServiceImplTest {
+class BookingServiceImplTest {
 
     @Mock
     private BookingRepository bookingRepository;
@@ -53,13 +56,15 @@ import static org.mockito.Mockito.*;
     private BookingCreatedEventProducer producer;
 
     @Mock
-    private BookingService self;
+    private ModelMapper modelMapper;
 
     @InjectMocks
     private BookingServiceImpl bookingService;
 
     private Booking booking;
     private BookingHistory bookingHistory;
+    private GetBookingDTO getBookingDTO;
+    private BookingHistoryDTO bookingHistoryDTO;
     private String token = "valid-token";
 
     @BeforeEach
@@ -78,35 +83,42 @@ import static org.mockito.Mockito.*;
         bookingHistory.setBooking(booking);
         bookingHistory.setStatus(BookingStatus.CONFIRMED.name());
         bookingHistory.setChangedAt(LocalDateTime.now());
+
+        getBookingDTO = new GetBookingDTO();
+        getBookingDTO.setId(1L);
+
+        bookingHistoryDTO = new BookingHistoryDTO();
     }
 
     @Test
-    void getAllBookings_Admin_ReturnsListOfBookings() {
+    void getAllBookings_Admin_ReturnsListOfDTOs() {
         // Given
         when(jwtTokenUtils.getRoles(token)).thenReturn(List.of("ROLE_ADMIN"));
         when(bookingRepository.findAll()).thenReturn(Collections.singletonList(booking));
+        when(modelMapper.map(booking, GetBookingDTO.class)).thenReturn(getBookingDTO);
 
         // When
-        List<Booking> result = bookingService.getAllBookings(token);
+        List<GetBookingDTO> result = bookingService.getAllBookings(token);
 
         // Then
         assertEquals(1, result.size());
-        assertEquals(booking, result.get(0));
+        assertEquals(getBookingDTO, result.get(0));
         verify(bookingRepository, times(1)).findAll();
     }
 
     @Test
-    void getBookingById_BookingExists_ReturnsBooking() {
+    void getBookingById_BookingExists_ReturnsDTO() {
         // Given
         when(bookingRepository.findById(1L)).thenReturn(Optional.of(booking));
         when(jwtTokenUtils.getUserId(token)).thenReturn(1L);
+        when(modelMapper.map(booking, GetBookingDTO.class)).thenReturn(getBookingDTO);
 
         // When
-        Booking result = bookingService.getBookingById(1L, token);
+        GetBookingDTO result = bookingService.getBookingById(1L, token);
 
         // Then
         assertNotNull(result);
-        assertEquals(booking, result);
+        assertEquals(getBookingDTO, result);
         verify(bookingRepository, times(1)).findById(1L);
     }
 
@@ -124,7 +136,7 @@ import static org.mockito.Mockito.*;
     }
 
     @Test
-    void getBookingByPropertyId_ReturnsListOfBookings() {
+    void getBookingByPropertyId_ReturnsListOfDTOs() {
         // Given
         GetPropertyDTO propertyDTO = new GetPropertyDTO();
         propertyDTO.setOwnerId(1L);
@@ -133,33 +145,35 @@ import static org.mockito.Mockito.*;
         when(jwtTokenUtils.getUserId(token)).thenReturn(1L);
         when(propertyClient.getPropertyById(1L)).thenReturn(propertyDTO);
         when(bookingRepository.findByPropertyId(1L)).thenReturn(Collections.singletonList(booking));
+        when(modelMapper.map(booking, GetBookingDTO.class)).thenReturn(getBookingDTO);
 
         // When
-        List<Booking> result = bookingService.getBookingByPropertyId(1L, token);
+        List<GetBookingDTO> result = bookingService.getBookingByPropertyId(1L, token);
 
         // Then
         assertEquals(1, result.size());
-        assertEquals(booking, result.get(0));
+        assertEquals(getBookingDTO, result.get(0));
         verify(bookingRepository, times(1)).findByPropertyId(1L);
     }
 
     @Test
-    void getBookingHistoryByBookingId_ReturnsListOfHistory() {
+    void getBookingHistoryByBookingId_ReturnsListOfHistoryDTOs() {
         // Given
         when(bookingHistoryRepository.findByBookingId(1L)).thenReturn(Collections.singletonList(bookingHistory));
+        when(modelMapper.map(bookingHistory, BookingHistoryDTO.class)).thenReturn(bookingHistoryDTO);
 
         // When
-        List<BookingHistory> result = bookingService.getBookingHistoryByBookingId(1L);
+        List<BookingHistoryDTO> result = bookingService.getBookingHistoryByBookingId(1L);
 
         // Then
         assertEquals(1, result.size());
-        assertEquals(bookingHistory, result.get(0));
+        assertEquals(bookingHistoryDTO, result.get(0));
         verify(bookingHistoryRepository, times(1)).findByBookingId(1L);
     }
 
     @Test
     @Transactional
-    void createBooking_ValidData_CreatesBooking() {
+    void createBooking_ValidData_ReturnsDTO() {
         // Given
         GetPropertyDTO propertyDTO = new GetPropertyDTO();
         propertyDTO.setTitle("Test Property");
@@ -177,8 +191,10 @@ import static org.mockito.Mockito.*;
         when(jwtTokenUtils.getEmail(token)).thenReturn("test@example.com");
         when(propertyClient.getPropertyById(1L)).thenReturn(propertyDTO);
 
+        when(modelMapper.map(any(Booking.class), eq(GetBookingDTO.class))).thenReturn(getBookingDTO);
+
         // When
-        Booking result = bookingService.createBooking(booking, token);
+        GetBookingDTO result = bookingService.createBooking(booking, token);
 
         // Then
         assertNotNull(result);
@@ -238,18 +254,19 @@ import static org.mockito.Mockito.*;
 
     @Test
     @Transactional
-    void updateBookingStatus_ValidData_UpdatesStatus() {
+    void updateBookingStatus_ValidData_ReturnsDTO() {
         // Given
         when(bookingRepository.findById(1L)).thenReturn(Optional.of(booking));
         when(jwtTokenUtils.getRoles(token)).thenReturn(List.of("ROLE_ADMIN"));
         when(bookingRepository.save(any(Booking.class))).thenReturn(booking);
 
+        when(modelMapper.map(booking, GetBookingDTO.class)).thenReturn(getBookingDTO);
+
         // When
-        Booking result = bookingService.updateBookingStatus(1L, BookingStatus.CANCELLED, token);
+        GetBookingDTO result = bookingService.updateBookingStatus(1L, BookingStatus.CANCELLED, token);
 
         // Then
         assertNotNull(result);
-        assertEquals(BookingStatus.CANCELLED, result.getStatus());
         verify(bookingRepository, times(1)).save(booking);
         verify(bookingHistoryRepository, times(1)).save(any(BookingHistory.class));
     }
@@ -367,5 +384,6 @@ import static org.mockito.Mockito.*;
         assertTrue(result.contains(LocalDate.now().plusDays(13)));
         assertFalse(result.contains(LocalDate.now().plusDays(6)));
     }
+
 
 }

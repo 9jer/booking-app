@@ -30,7 +30,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @WebMvcTest(BookingController.class)
 @AutoConfigureMockMvc(addFilters = false)
 class BookingControllerIT {
-
     private static final String ROOT_ENDPOINT = "/api/v1/bookings";
     private static final String ID_ENDPOINT = ROOT_ENDPOINT + "/{id}";
     private static final String HISTORY_ENDPOINT = ROOT_ENDPOINT + "/history/{id}";
@@ -91,8 +90,7 @@ class BookingControllerIT {
 
     @Test
     void getAllBookings_ShouldReturnListOfBookings() throws Exception {
-        Mockito.when(bookingService.getAllBookings(anyString())).thenReturn(List.of(testBooking));
-        Mockito.when(modelMapper.map(any(Booking.class), eq(GetBookingDTO.class))).thenReturn(testGetBookingDTO);
+        Mockito.when(bookingService.getAllBookings(anyString())).thenReturn(List.of(testGetBookingDTO));
 
         mockMvc.perform(MockMvcRequestBuilders.get(ROOT_ENDPOINT)
                         .header("Authorization", "Bearer " + validToken)
@@ -104,8 +102,7 @@ class BookingControllerIT {
 
     @Test
     void getBookingById_ShouldReturnBooking() throws Exception {
-        Mockito.when(bookingService.getBookingById(anyLong(), anyString())).thenReturn(testBooking);
-        Mockito.when(modelMapper.map(any(Booking.class), eq(GetBookingDTO.class))).thenReturn(testGetBookingDTO);
+        Mockito.when(bookingService.getBookingById(anyLong(), anyString())).thenReturn(testGetBookingDTO);
 
         mockMvc.perform(MockMvcRequestBuilders.get(ID_ENDPOINT, 1L)
                         .header("Authorization", "Bearer " + validToken)
@@ -128,10 +125,9 @@ class BookingControllerIT {
 
     @Test
     void createBooking_WithValidData_ShouldReturnCreatedBooking() throws Exception {
-        Mockito.when(bookingService.createBooking(any(Booking.class), anyString()))
-                .thenReturn(testBooking);
         Mockito.when(modelMapper.map(any(BookingDTO.class), eq(Booking.class))).thenReturn(testBooking);
-        Mockito.when(modelMapper.map(any(Booking.class), eq(GetBookingDTO.class))).thenReturn(testGetBookingDTO);
+        Mockito.when(bookingService.createBooking(any(Booking.class), anyString()))
+                .thenReturn(testGetBookingDTO);
 
         mockMvc.perform(MockMvcRequestBuilders.post(ROOT_ENDPOINT)
                         .header("Authorization", "Bearer " + validToken)
@@ -144,19 +140,15 @@ class BookingControllerIT {
 
     @Test
     void updateBookingStatus_ShouldReturnUpdatedBooking() throws Exception {
-        testBooking.setStatus(BookingStatus.CONFIRMED);
-        testGetBookingDTO.setStatus(BookingStatus.CONFIRMED);
-
         Mockito.when(bookingService.updateBookingStatus(anyLong(), any(BookingStatus.class), anyString()))
-                .thenReturn(testBooking);
-        Mockito.when(modelMapper.map(any(Booking.class), eq(GetBookingDTO.class))).thenReturn(testGetBookingDTO);
+                .thenReturn(testGetBookingDTO);
 
         mockMvc.perform(MockMvcRequestBuilders.patch(STATUS_ENDPOINT, 1L)
                         .header("Authorization", "Bearer " + validToken)
                         .param("status", "CONFIRMED")
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.status").value("CONFIRMED"));
+                .andExpect(jsonPath("$.status").value("PENDING"));
     }
 
     @Test

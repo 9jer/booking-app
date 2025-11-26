@@ -2,6 +2,8 @@ package com.example.bookingservice.services;
 
 import com.example.bookingservice.client.PropertyClient;
 import com.example.bookingservice.client.UserClient;
+import com.example.bookingservice.dto.BookingHistoryDTO;
+import com.example.bookingservice.dto.GetBookingDTO;
 import com.example.bookingservice.dto.GetPropertyDTO;
 import com.example.bookingservice.event.BookingCreatedEvent;
 import com.example.bookingservice.event.BookingCreatedEventProducer;
@@ -13,7 +15,9 @@ import com.example.bookingservice.repositories.BookingRepository;
 import com.example.bookingservice.util.BookingException;
 import com.example.bookingservice.util.JwtTokenUtils;
 import lombok.RequiredArgsConstructor;
+import org.modelmapper.ModelMapper;
 import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.CachePut;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
@@ -23,6 +27,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 @Transactional(readOnly = true)
@@ -34,46 +39,48 @@ public class BookingServiceImpl implements BookingService {
     private final UserClient userClient;
     private final JwtTokenUtils jwtTokenUtils;
     private final BookingCreatedEventProducer producer;
+    private final ModelMapper modelMapper;
 
     private static final int MAX_BOOKING_WINDOW_MONTHS = 3;
 
     @Override
-    public List<Booking> getAllBookings(String token) {
+    public List<GetBookingDTO> getAllBookings(String token) {
         List<String> roles = jwtTokenUtils.getRoles(token);
+        List<Booking> bookings;
+
         if (roles.contains("ROLE_ADMIN")) {
-            return bookingRepository.findAll();
+            bookings = bookingRepository.findAll();
+        } else {
+            Long currentUserId = jwtTokenUtils.getUserId(token);
+            bookings = bookingRepository.findByUserId(currentUserId);
         }
 
-        Long currentUserId = jwtTokenUtils.getUserId(token);
-        return bookingRepository.findByUserId(currentUserId);
+        return bookings.stream()
+                .map(this::convertToGetBookingDTO)
+                .collect(Collectors.toList());
     }
 
     @Override
-    public Booking getBookingById(Long bookingId, String token) {
+    @Cacheable(value = "bookingById", key = "#bookingId")
+    public GetBookingDTO getBookingById(Long bookingId, String token) {
         Booking booking = bookingRepository.findById(bookingId)
                 .orElseThrow(() -> new BookingException("Booking not found"));
 
         Long currentUserId = jwtTokenUtils.getUserId(token);
         List<String> roles = jwtTokenUtils.getRoles(token);
 
-        if (roles.contains("ROLE_ADMIN")) {
-            return booking;
+        if (!roles.contains("ROLE_ADMIN") && !booking.getUserId().equals(currentUserId)) {
+            GetPropertyDTO property = propertyClient.getPropertyById(booking.getPropertyId());
+            if (!property.getOwnerId().equals(currentUserId)) {
+                throw new BookingException("You do not have permission to view this booking.");
+            }
         }
 
-        if (booking.getUserId().equals(currentUserId)) {
-            return booking;
-        }
-
-        GetPropertyDTO property = propertyClient.getPropertyById(booking.getPropertyId());
-        if (property.getOwnerId().equals(currentUserId)) {
-            return booking;
-        }
-
-        throw new BookingException("You do not have permission to view this booking.");
+        return convertToGetBookingDTO(booking);
     }
 
     @Override
-    public List<Booking> getBookingByPropertyId(Long propertyId, String token) {
+    public List<GetBookingDTO> getBookingByPropertyId(Long propertyId, String token) {
         List<String> roles = jwtTokenUtils.getRoles(token);
         if (!roles.contains("ROLE_ADMIN")) {
             Long currentUserId = jwtTokenUtils.getUserId(token);
@@ -88,18 +95,22 @@ public class BookingServiceImpl implements BookingService {
             }
         }
 
-        return bookingRepository.findByPropertyId(propertyId);
+        return bookingRepository.findByPropertyId(propertyId).stream()
+                .map(this::convertToGetBookingDTO)
+                .collect(Collectors.toList());
     }
 
     @Override
-    public List<BookingHistory> getBookingHistoryByBookingId(Long bookingId) {
-        return bookingHistoryRepository.findByBookingId(bookingId);
+    public List<BookingHistoryDTO> getBookingHistoryByBookingId(Long bookingId) {
+        return bookingHistoryRepository.findByBookingId(bookingId).stream()
+                .map(this::convertToBookingHistoryDTO)
+                .collect(Collectors.toList());
     }
 
     @Override
     @Transactional(isolation = Isolation.SERIALIZABLE)
     @CacheEvict(value = "availableDates", key = "#booking.propertyId")
-    public Booking createBooking(Booking booking, String token) {
+    public GetBookingDTO createBooking(Booking booking, String token) {
         booking.setId(null);
 
         if (booking.getStatus() == null) {
@@ -132,18 +143,19 @@ public class BookingServiceImpl implements BookingService {
             sendNotification(savedBooking, token);
         }
 
-        return savedBooking;
+        return convertToGetBookingDTO(savedBooking);
     }
 
     @Override
     @Transactional
     @CacheEvict(value = "availableDates", key = "#result.propertyId")
-    public Booking updateBookingStatus(Long bookingId, BookingStatus bookingStatus, String token) {
+    @CachePut(value = "bookingById", key = "#bookingId")
+    public GetBookingDTO updateBookingStatus(Long bookingId, BookingStatus bookingStatus, String token) {
         Booking booking = bookingRepository.findById(bookingId)
                 .orElseThrow(() -> new BookingException("Booking not found"));
 
         if (booking.getStatus() == bookingStatus) {
-            return booking;
+            return convertToGetBookingDTO(booking);
         }
 
         List<String> roles = jwtTokenUtils.getRoles(token);
@@ -166,7 +178,7 @@ public class BookingServiceImpl implements BookingService {
             sendNotification(updatedBooking, token);
         }
 
-        return updatedBooking;
+        return convertToGetBookingDTO(updatedBooking);
     }
 
     @Override
@@ -274,5 +286,13 @@ public class BookingServiceImpl implements BookingService {
         bookingCreatedEvent.setCheckOutDate(booking.getCheckOutDate().toString());
 
         producer.sendBookingCreatedEvent("booking-created", bookingCreatedEvent);
+    }
+
+    private GetBookingDTO convertToGetBookingDTO(Booking booking) {
+        return modelMapper.map(booking, GetBookingDTO.class);
+    }
+
+    private BookingHistoryDTO convertToBookingHistoryDTO(BookingHistory bookingHistory) {
+        return modelMapper.map(bookingHistory, BookingHistoryDTO.class);
     }
 }
