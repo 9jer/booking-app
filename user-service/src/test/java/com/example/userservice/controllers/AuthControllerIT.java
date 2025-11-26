@@ -4,7 +4,6 @@ import com.example.userservice.dto.JwtRequest;
 import com.example.userservice.dto.JwtResponse;
 import com.example.userservice.dto.SaveUserDTO;
 import com.example.userservice.dto.UserDTO;
-import com.example.userservice.models.User;
 import com.example.userservice.services.AuthService;
 import com.example.userservice.util.AuthException;
 import com.example.userservice.util.JwtTokenUtils;
@@ -54,7 +53,6 @@ class AuthControllerIT {
     private JwtRequest testJwtRequest;
     private SaveUserDTO testSaveUserDTO;
     private JwtResponse testJwtResponse;
-    private User testUser;
     private UserDTO testUserDTO;
 
     @BeforeEach
@@ -72,11 +70,6 @@ class AuthControllerIT {
         testSaveUserDTO.setPhone("1234567890");
 
         testJwtResponse = new JwtResponse("test.token.here");
-
-        testUser = new User();
-        testUser.setId(1L);
-        testUser.setUsername("testuser");
-        testUser.setEmail("test@example.com");
 
         testUserDTO = new UserDTO();
         testUserDTO.setId(1L);
@@ -129,8 +122,7 @@ class AuthControllerIT {
     @Test
     void createNewUser_WithValidData_ShouldReturnCreatedUser() throws Exception {
         Mockito.when(authService.createNewUser(any(SaveUserDTO.class)))
-                .thenReturn(testUser);
-        Mockito.when(modelMapper.map(testUser, UserDTO.class)).thenReturn(testUserDTO);
+                .thenReturn(testUserDTO);
 
         mockMvc.perform(post(SIGN_UP_ENDPOINT)
                         .contentType(MediaType.APPLICATION_JSON)

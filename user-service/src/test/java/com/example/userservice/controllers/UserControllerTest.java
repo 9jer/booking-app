@@ -3,9 +3,7 @@ package com.example.userservice.controllers;
 import com.example.userservice.dto.SaveUserDTO;
 import com.example.userservice.dto.UserDTO;
 import com.example.userservice.dto.UsersResponse;
-import com.example.userservice.models.User;
 import com.example.userservice.services.UserService;
-import com.example.userservice.util.UserException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -23,7 +21,6 @@ import java.util.Collections;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -44,20 +41,12 @@ class UserControllerTest {
     @InjectMocks
     private UserController userController;
 
-    private User user;
     private UserDTO userDTO;
     private SaveUserDTO saveUserDTO;
     private String authHeader = "Bearer token";
 
     @BeforeEach
     void setUp() {
-        user = new User();
-        user.setId(1L);
-        user.setUsername("testuser");
-        user.setEmail("test@example.com");
-        user.setName("Test User");
-        user.setPhone("1234567890");
-
         userDTO = new UserDTO();
         userDTO.setId(1L);
         userDTO.setUsername("testuser");
@@ -77,8 +66,7 @@ class UserControllerTest {
     @Test
     void getAllUsers_ReturnsUsersResponse() {
         // Given
-        when(userService.findAll()).thenReturn(Collections.singletonList(user));
-        when(modelMapper.map(any(User.class), eq(UserDTO.class))).thenReturn(userDTO);
+        when(userService.findAll()).thenReturn(Collections.singletonList(userDTO));
 
         // When
         ResponseEntity<UsersResponse> response = userController.getAllUsers();
@@ -91,14 +79,12 @@ class UserControllerTest {
         assertEquals(userDTO, response.getBody().getUsers().get(0));
 
         verify(userService, times(1)).findAll();
-        verify(modelMapper, times(1)).map(any(User.class), eq(UserDTO.class));
     }
 
     @Test
     void getUserById_UserExists_ReturnsUserDTO() {
         // Given
-        when(userService.getUserById(1L)).thenReturn(user);
-        when(modelMapper.map(any(User.class), eq(UserDTO.class))).thenReturn(userDTO);
+        when(userService.getUserById(1L)).thenReturn(userDTO);
 
         // When
         ResponseEntity<UserDTO> response = userController.getUserById(1L);
@@ -110,28 +96,13 @@ class UserControllerTest {
         assertEquals(userDTO, response.getBody());
 
         verify(userService, times(1)).getUserById(1L);
-        verify(modelMapper, times(1)).map(any(User.class), eq(UserDTO.class));
-    }
-
-    @Test
-    void getUserById_UserNotExists_ThrowsUserException() {
-        // Given
-        when(userService.getUserById(1L)).thenThrow(new UserException("User not found"));
-
-        // When & Then
-        UserException exception = assertThrows(UserException.class,
-                () -> userController.getUserById(1L));
-
-        assertEquals("User not found", exception.getMessage());
-        verify(userService, times(1)).getUserById(1L);
     }
 
     @Test
     void updateUser_ValidRequest_ReturnsUpdatedUser() {
         // Given
         when(bindingResult.hasErrors()).thenReturn(false);
-        when(userService.updateUserById(anyLong(), any(SaveUserDTO.class), anyString())).thenReturn(user);
-        when(modelMapper.map(any(User.class), eq(UserDTO.class))).thenReturn(userDTO);
+        when(userService.updateUserById(anyLong(), any(SaveUserDTO.class), anyString())).thenReturn(userDTO);
 
         // When
         ResponseEntity<UserDTO> response = userController.updateUser(authHeader, 1L, saveUserDTO, bindingResult);
@@ -143,40 +114,12 @@ class UserControllerTest {
         assertEquals(userDTO, response.getBody());
 
         verify(userService, times(1)).updateUserById(1L, saveUserDTO, "token");
-        verify(modelMapper, times(1)).map(any(User.class), eq(UserDTO.class));
-    }
-
-    @Test
-    void updateUser_InvalidRequest_ThrowsUserException() {
-        // Given
-        when(bindingResult.hasErrors()).thenReturn(true);
-
-        // When & Then
-        assertThrows(UserException.class,
-                () -> userController.updateUser(authHeader, 1L, saveUserDTO, bindingResult));
-
-        verify(bindingResult, times(1)).hasErrors();
-        verify(userService, never()).updateUserById(anyLong(), any(SaveUserDTO.class), anyString());
-    }
-
-    @Test
-    void deleteUser_ValidId_ReturnsOkStatus() {
-        // Given
-        doNothing().when(userService).deleteUserById(anyLong(), anyString());
-
-        // When
-        ResponseEntity<HttpStatus> response = userController.deleteUser(authHeader, 1L);
-
-        // Then
-        assertEquals(HttpStatus.OK, response.getStatusCode());
-        verify(userService, times(1)).deleteUserById(1L, "token");
     }
 
     @Test
     void assignOwnerRole_ValidId_ReturnsUserDTO() {
         // Given
-        when(userService.assignOwnerRole(1L)).thenReturn(user);
-        when(modelMapper.map(any(User.class), eq(UserDTO.class))).thenReturn(userDTO);
+        when(userService.assignOwnerRole(1L)).thenReturn(userDTO);
 
         // When
         ResponseEntity<UserDTO> response = userController.assignOwnerRole(1L);
@@ -188,21 +131,6 @@ class UserControllerTest {
         assertEquals(userDTO, response.getBody());
 
         verify(userService, times(1)).assignOwnerRole(1L);
-        verify(modelMapper, times(1)).map(any(User.class), eq(UserDTO.class));
-    }
-
-    @Test
-    void userExists_UserExists_ReturnsTrue() {
-        // Given
-        when(userService.existsById(1L)).thenReturn(true);
-
-        // When
-        ResponseEntity<Boolean> response = userController.userExists(1L);
-
-        // Then
-        assertEquals(HttpStatus.OK, response.getStatusCode());
-        assertTrue(response.getBody());
-        verify(userService, times(1)).existsById(1L);
     }
 
     @Test

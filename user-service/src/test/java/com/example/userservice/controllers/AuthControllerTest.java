@@ -4,7 +4,6 @@ import com.example.userservice.dto.JwtRequest;
 import com.example.userservice.dto.JwtResponse;
 import com.example.userservice.dto.SaveUserDTO;
 import com.example.userservice.dto.UserDTO;
-import com.example.userservice.models.User;
 import com.example.userservice.services.AuthService;
 import com.example.userservice.util.UserException;
 import org.junit.jupiter.api.BeforeEach;
@@ -45,7 +44,6 @@ class AuthControllerTest {
     private JwtRequest jwtRequest;
     private SaveUserDTO saveUserDTO;
     private JwtResponse jwtResponse;
-    private User user;
     private UserDTO userDTO;
 
     @BeforeEach
@@ -63,11 +61,6 @@ class AuthControllerTest {
         saveUserDTO.setPhone("1234567890");
 
         jwtResponse = new JwtResponse("testtoken");
-
-        user = new User();
-        user.setId(1L);
-        user.setUsername("testuser");
-        user.setEmail("test@example.com");
 
         userDTO = new UserDTO();
         userDTO.setId(1L);
@@ -112,11 +105,10 @@ class AuthControllerTest {
     void createNewUser_ValidRequest_ReturnsUser() {
         // Given
         when(bindingResult.hasErrors()).thenReturn(false);
-        when(authService.createNewUser(any(SaveUserDTO.class))).thenReturn(user);
-        when(modelMapper.map(user, UserDTO.class)).thenReturn(userDTO);
+        when(authService.createNewUser(any(SaveUserDTO.class))).thenReturn(userDTO);
 
         // When
-        ResponseEntity<?> response = authController.createNewUser(saveUserDTO, bindingResult);
+        ResponseEntity<UserDTO> response = authController.createNewUser(saveUserDTO, bindingResult);
 
         // Then
         assertEquals(HttpStatus.OK, response.getStatusCode());

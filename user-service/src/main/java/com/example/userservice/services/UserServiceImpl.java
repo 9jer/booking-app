@@ -1,103 +1,75 @@
 package com.example.userservice.services;
 
 import com.example.userservice.dto.SaveUserDTO;
+import com.example.userservice.dto.UserDTO;
 import com.example.userservice.models.Role;
 import com.example.userservice.models.User;
 import com.example.userservice.repositories.UserRepository;
-import com.example.userservice.util.ErrorsUtil;
 import com.example.userservice.util.JwtTokenUtils;
 import com.example.userservice.util.UserException;
+import lombok.RequiredArgsConstructor;
 import org.modelmapper.ModelMapper;
-import org.springframework.cache.Cache;
-import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.CachePut;
 import org.springframework.cache.annotation.Cacheable;
-import org.springframework.cache.annotation.Caching;
-import org.springframework.context.annotation.Lazy;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Service("userServiceImpl")
+@RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class UserServiceImpl implements UserService {
+
     private final UserRepository userRepository;
     private final RoleService roleService;
     private final PasswordEncoder passwordEncoder;
     private final ModelMapper modelMapper;
-    private final CacheManager cacheManager;
     private final JwtTokenUtils jwtTokenUtils;
 
-    private final UserService self;
-
-    public UserServiceImpl(@Lazy UserService self, UserRepository userRepository, RoleService roleService,
-                           PasswordEncoder passwordEncoder, ModelMapper modelMapper, CacheManager cacheManager,
-                           JwtTokenUtils jwtTokenUtils) {
-        this.self = self;
-        this.userRepository = userRepository;
-        this.roleService = roleService;
-        this.passwordEncoder = passwordEncoder;
-        this.modelMapper = modelMapper;
-        this.cacheManager = cacheManager;
-        this.jwtTokenUtils = jwtTokenUtils;
-    }
-
     @Override
-    @Cacheable(value = "userByUsername", key = "#username", unless = "#result == null")
     public Optional<User> findByUsername(String username) {
-        Optional<User> userOptional = userRepository.findByUsername(username);
-        return userOptional.map(this::convertToDetachedUser);
+        return userRepository.findByUsername(username);
     }
 
-    @Override
-    @Cacheable(value = "userByEmail", key = "#email", unless = "#result == null")
     public Optional<User> findByEmail(String email) {
-        Optional<User> userOptional = userRepository.findByEmail(email);
-        return userOptional.map(this::convertToDetachedUser);
+        return userRepository.findByEmail(email);
     }
 
     @Override
     @Transactional
-    @Caching(
-            put = {
-                    @CachePut(value = "userById", key = "#result.id"),
-                    @CachePut(value = "userByUsername", key = "#result.username")
-            },
-            evict = {
-                    @CacheEvict(value = "userByEmail", key = "#result.email")
-            })
-    public User createNewUser(User user) {
+    public UserDTO createNewUser(User user) {
         user.setPassword(passwordEncoder.encode(user.getPassword()));
         user.setRoles(List.of(roleService.getGuestRole()));
         user.setCreatedAt(LocalDateTime.now());
         User savedUser = userRepository.save(user);
-        return convertToDetachedUser(savedUser);
+        return convertToUserDTO(savedUser);
     }
 
     @Override
-    public List<User> findAll() {
-        return userRepository.findAll();
+    public List<UserDTO> findAll() {
+        return userRepository.findAll().stream()
+                .map(this::convertToUserDTO)
+                .collect(Collectors.toList());
     }
 
     @Override
     @Cacheable(value = "userById", key = "#id")
-    public User getUserById(Long id) {
+    public UserDTO getUserById(Long id) {
         User user = userRepository.findById(id).orElseThrow(() ->
                 new UserException(String.format("User %s not found", id)));
-        return convertToDetachedUser(user);
+        return convertToUserDTO(user);
     }
 
     @Override
     @Transactional
     @CachePut(value = "userById", key = "#id")
-    public User updateUserById(Long id, SaveUserDTO updatedUser, String token) {
+    public UserDTO updateUserById(Long id, SaveUserDTO updatedUser, String token) {
         Long currentUserId = jwtTokenUtils.getUserId(token);
         List<String> roles = jwtTokenUtils.getRoles(token);
 
@@ -105,48 +77,34 @@ public class UserServiceImpl implements UserService {
             throw new UserException("You can only update your own account.");
         }
 
-        Optional<User> userByUsername = self.findByUsername(updatedUser.getUsername());
-        Optional<User> userByEmail = self.findByEmail(updatedUser.getEmail());
-
-        if(userByUsername.isPresent() && userByUsername.get().getId().equals(id)) {
-            userByUsername = Optional.empty();
+        if (!updatedUser.getPassword().equals(updatedUser.getConfirmPassword())) {
+            throw new UserException("Incorrect password!");
         }
 
-        if(userByEmail.isPresent() && userByEmail.get().getId().equals(id)) {
-            userByEmail = Optional.empty();
-        }
+        Optional<User> userByUsername = userRepository.findByUsername(updatedUser.getUsername());
+        Optional<User> userByEmail = userRepository.findByEmail(updatedUser.getEmail());
 
-        ErrorsUtil.validateInputUserData(updatedUser, userByUsername, userByEmail);
+        if(userByUsername.isPresent() && !userByUsername.get().getId().equals(id)) {
+            throw new UserException("Username already taken");
+        }
+        if(userByEmail.isPresent() && !userByEmail.get().getId().equals(id)) {
+            throw new UserException("Email already taken");
+        }
 
         User existingUser = userRepository.findById(id).orElseThrow(() ->
                 new UserException(String.format("User %s not found", id)));
 
-        evictUserCaches(existingUser);
-
-        User user = convertUserDTOToUser(updatedUser);
+        User user = convertSaveUserDTOToUser(updatedUser);
         enrichPropertyForUpdate(existingUser, user);
 
         User savedUser = userRepository.save(existingUser);
-        return convertToDetachedUser(savedUser);
-    }
-
-    private User convertUserDTOToUser(SaveUserDTO saveUserDTO){
-        return modelMapper.map(saveUserDTO, User.class);
-    }
-
-    private void enrichPropertyForUpdate(User exsitingUser, User updatedUser) {
-        exsitingUser.setUsername(updatedUser.getUsername());
-        exsitingUser.setPassword(passwordEncoder.encode(updatedUser.getPassword()));
-        exsitingUser.setName(updatedUser.getName());
-        exsitingUser.setEmail(updatedUser.getEmail());
-        exsitingUser.setPhone(updatedUser.getPhone());
-        exsitingUser.setUpdatedAt(LocalDateTime.now());
+        return convertToUserDTO(savedUser);
     }
 
     @Override
     @Transactional
     @CachePut(value = "userById", key = "#userId")
-    public User assignOwnerRole(Long userId) {
+    public UserDTO assignOwnerRole(Long userId) {
         User user = userRepository.findById(userId).orElseThrow(() ->
                 new UserException("User not found"));
 
@@ -156,11 +114,10 @@ public class UserServiceImpl implements UserService {
             throw new UserException("User already has OWNER role");
         }
 
-        evictUserCaches(user);
         user.getRoles().add(ownerRole);
-
         User savedUser = userRepository.save(user);
-        return convertToDetachedUser(savedUser);
+
+        return convertToUserDTO(savedUser);
     }
 
     @Override
@@ -170,6 +127,7 @@ public class UserServiceImpl implements UserService {
 
     @Override
     @Transactional
+    @CacheEvict(value = "userById", key = "#id")
     public void deleteUserById(Long id, String token) {
         Long currentUserId = jwtTokenUtils.getUserId(token);
         List<String> roles = jwtTokenUtils.getRoles(token);
@@ -178,48 +136,33 @@ public class UserServiceImpl implements UserService {
             throw new UserException("You can only delete your own account.");
         }
 
-        User user = userRepository.findById(id).orElseThrow(() -> new UserException("User not found"));
-
-        evictUserCaches(user);
-        if (cacheManager.getCache("userById") != null) {
-            Objects.requireNonNull(cacheManager.getCache("userById")).evict(id);
+        if (!userRepository.existsById(id)) {
+            throw new UserException("User not found");
         }
 
-        userRepository.delete(user);
+        userRepository.deleteById(id);
     }
 
-    private void evictUserCaches(User user) {
-        if (user.getUsername() != null) {
-            Cache usernameCache = cacheManager.getCache("userByUsername");
-            if (usernameCache != null) {
-                usernameCache.evict(user.getUsername());
-            }
-        }
-        if (user.getEmail() != null) {
-            Cache emailCache = cacheManager.getCache("userByEmail");
-            if (emailCache != null) {
-                emailCache.evict(user.getEmail());
-            }
-        }
-    }
-
-    private User convertToDetachedUser(User user) {
-        User detachedUser = new User();
-        detachedUser.setId(user.getId());
-        detachedUser.setUsername(user.getUsername());
-        detachedUser.setEmail(user.getEmail());
-        detachedUser.setName(user.getName());
-        detachedUser.setPhone(user.getPhone());
-        detachedUser.setPassword(user.getPassword());
-        detachedUser.setCreatedAt(user.getCreatedAt());
-        detachedUser.setUpdatedAt(user.getUpdatedAt());
-
+    private UserDTO convertToUserDTO(User user) {
+        UserDTO dto = modelMapper.map(user, UserDTO.class);
         if (user.getRoles() != null) {
-            detachedUser.setRoles(new ArrayList<>(user.getRoles()));
-        } else {
-            detachedUser.setRoles(new ArrayList<>());
+            dto.setRoles(user.getRoles().stream()
+                    .map(Role::getName)
+                    .collect(Collectors.toList()));
         }
+        return dto;
+    }
 
-        return detachedUser;
+    private User convertSaveUserDTOToUser(SaveUserDTO saveUserDTO){
+        return modelMapper.map(saveUserDTO, User.class);
+    }
+
+    private void enrichPropertyForUpdate(User existingUser, User updatedUser) {
+        existingUser.setUsername(updatedUser.getUsername());
+        existingUser.setPassword(passwordEncoder.encode(updatedUser.getPassword()));
+        existingUser.setName(updatedUser.getName());
+        existingUser.setEmail(updatedUser.getEmail());
+        existingUser.setPhone(updatedUser.getPhone());
+        existingUser.setUpdatedAt(LocalDateTime.now());
     }
 }

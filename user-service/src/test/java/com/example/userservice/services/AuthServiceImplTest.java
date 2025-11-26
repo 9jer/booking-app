@@ -3,6 +3,7 @@ package com.example.userservice.services;
 import com.example.userservice.dto.JwtRequest;
 import com.example.userservice.dto.JwtResponse;
 import com.example.userservice.dto.SaveUserDTO;
+import com.example.userservice.dto.UserDTO;
 import com.example.userservice.models.User;
 import com.example.userservice.security.CustomUserDetails;
 import com.example.userservice.security.CustomUserDetailsService;
@@ -51,6 +52,7 @@ class AuthServiceImplTest {
     private JwtRequest jwtRequest;
     private SaveUserDTO saveUserDTO;
     private User user;
+    private UserDTO userDTO;
     private CustomUserDetails userDetails;
 
     @BeforeEach
@@ -71,6 +73,10 @@ class AuthServiceImplTest {
         user.setId(1L);
         user.setUsername("testuser");
         user.setEmail("test@example.com");
+
+        userDTO = new UserDTO();
+        userDTO.setId(1L);
+        userDTO.setUsername("testuser");
 
         userDetails = new CustomUserDetails(user);
     }
@@ -115,10 +121,11 @@ class AuthServiceImplTest {
         when(userService.findByUsername("testuser")).thenReturn(Optional.empty());
         when(userService.findByEmail("test@example.com")).thenReturn(Optional.empty());
         when(modelMapper.map(saveUserDTO, User.class)).thenReturn(user);
-        when(userService.createNewUser(user)).thenReturn(user);
+
+        when(userService.createNewUser(user)).thenReturn(userDTO);
 
         // When
-        User result = authService.createNewUser(saveUserDTO);
+        UserDTO result = authService.createNewUser(saveUserDTO);
 
         // Then
         assertNotNull(result);

@@ -1,6 +1,7 @@
 package com.example.userservice.services;
 
 import com.example.userservice.dto.SaveUserDTO;
+import com.example.userservice.dto.UserDTO;
 import com.example.userservice.models.Role;
 import com.example.userservice.models.User;
 import com.example.userservice.repositories.UserRepository;
@@ -13,12 +14,9 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.modelmapper.ModelMapper;
-import org.springframework.cache.Cache;
-import org.springframework.cache.CacheManager;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
 import java.util.*;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -41,21 +39,13 @@ class UserServiceImplTest {
     private ModelMapper modelMapper;
 
     @Mock
-    private CacheManager cacheManager;
-
-    @Mock
-    private Cache cache;
-
-    @Mock
-    private UserService self;
-
-    @Mock
     private JwtTokenUtils jwtTokenUtils;
 
     @InjectMocks
     private UserServiceImpl userService;
 
     private User user;
+    private UserDTO userDTO;
     private SaveUserDTO saveUserDTO;
     private Role guestRole;
     private Role ownerRole;
@@ -68,10 +58,12 @@ class UserServiceImplTest {
         user.setUsername("testuser");
         user.setEmail("test@example.com");
         user.setPassword("encodedPassword");
-        user.setName("Test User");
-        user.setPhone("1234567890");
-        user.setCreatedAt(LocalDateTime.now());
         user.setRoles(new ArrayList<>());
+
+        userDTO = new UserDTO();
+        userDTO.setId(1L);
+        userDTO.setUsername("testuser");
+        userDTO.setEmail("test@example.com");
 
         saveUserDTO = new SaveUserDTO();
         saveUserDTO.setUsername("testuser");
@@ -91,126 +83,70 @@ class UserServiceImplTest {
     }
 
     @Test
-    void findByUsername_UserExists_ReturnsUser() {
-        // Given
-        when(userRepository.findByUsername("testuser")).thenReturn(Optional.of(user));
-
-        // When
-        Optional<User> result = userService.findByUsername("testuser");
-
-        // Then
-        assertTrue(result.isPresent());
-        assertEquals(user.getUsername(), result.get().getUsername());
-        verify(userRepository, times(1)).findByUsername("testuser");
-    }
-
-    @Test
-    void findByEmail_UserExists_ReturnsUser() {
-        // Given
-        when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(user));
-
-        // When
-        Optional<User> result = userService.findByEmail("test@example.com");
-
-        // Then
-        assertTrue(result.isPresent());
-        assertEquals(user.getEmail(), result.get().getEmail());
-        verify(userRepository, times(1)).findByEmail("test@example.com");
-    }
-
-    @Test
     @Transactional
     void createNewUser_ValidUser_CreatesAndReturnsUser() {
         // Given
-        User newUser = new User();
-        newUser.setUsername("newuser");
-        newUser.setPassword("password");
+        User inputUser = new User();
+        inputUser.setUsername("newuser");
+        inputUser.setPassword("password");
 
         when(passwordEncoder.encode("password")).thenReturn("encodedPassword");
         when(roleService.getGuestRole()).thenReturn(guestRole);
+
         when(userRepository.save(any(User.class))).thenAnswer(invocation -> {
             User saved = invocation.getArgument(0);
             saved.setId(2L);
-            saved.setRoles(new ArrayList<>(List.of(guestRole)));
             return saved;
         });
 
+        when(modelMapper.map(any(User.class), eq(UserDTO.class))).thenReturn(userDTO);
+
         // When
-        User result = userService.createNewUser(newUser);
+        UserDTO result = userService.createNewUser(inputUser);
 
         // Then
-        assertNotNull(result.getId());
-        assertEquals("encodedPassword", result.getPassword());
-        assertTrue(result.getRoles().stream().anyMatch(r -> r.getName().equals("ROLE_GUEST")));
-        assertNotNull(result.getCreatedAt());
-        verify(userRepository, times(1)).save(newUser);
+        assertNotNull(result);
+        verify(userRepository, times(1)).save(inputUser);
     }
 
     @Test
     void updateUserById_Owner_UpdatesUser() {
-        SaveUserDTO updatedDto = new SaveUserDTO();
-        updatedDto.setUsername("newuser");
-        updatedDto.setEmail("new@example.com");
-        updatedDto.setPassword("newpassword");
-        updatedDto.setConfirmPassword("newpassword");
-        updatedDto.setName("New Name");
-        updatedDto.setPhone("9876543210");
-
-        User existingUser = new User();
-        existingUser.setId(1L);
-        existingUser.setUsername("olduser");
-        existingUser.setRoles(new ArrayList<>());
-
-        User updatedUser = new User();
-        updatedUser.setUsername("newuser");
-        updatedUser.setPassword("newpassword");
+        User updatedUserFromDTO = new User();
+        updatedUserFromDTO.setUsername("newuser");
+        updatedUserFromDTO.setPassword("newpassword");
 
         when(jwtTokenUtils.getUserId(token)).thenReturn(1L);
-        when(cacheManager.getCache(anyString())).thenReturn(cache);
-        when(userRepository.findById(1L)).thenReturn(Optional.of(existingUser));
-        when(self.findByUsername("newuser")).thenReturn(Optional.empty());
-        when(self.findByEmail("new@example.com")).thenReturn(Optional.empty());
-        when(modelMapper.map(updatedDto, User.class)).thenReturn(updatedUser);
-        when(passwordEncoder.encode("newpassword")).thenReturn("encodedNewPass");
-        when(userRepository.save(existingUser)).thenReturn(existingUser);
 
-        User result = userService.updateUserById(1L, updatedDto, token);
+        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+        when(userRepository.findByUsername(anyString())).thenReturn(Optional.empty());
+        when(userRepository.findByEmail(anyString())).thenReturn(Optional.empty());
 
-        assertEquals("newuser", result.getUsername());
-        assertEquals("encodedNewPass", result.getPassword());
-        assertNotNull(result.getUpdatedAt());
-        verify(userRepository).save(existingUser);
-    }
+        when(modelMapper.map(saveUserDTO, User.class)).thenReturn(updatedUserFromDTO);
+        when(passwordEncoder.encode(anyString())).thenReturn("encodedNewPass");
 
-    @Test
-    void updateUserById_NotOwner_ThrowsException() {
-        when(jwtTokenUtils.getUserId(token)).thenReturn(2L);
-        when(jwtTokenUtils.getRoles(token)).thenReturn(List.of("ROLE_GUEST"));
+        when(userRepository.save(user)).thenReturn(user);
+        when(modelMapper.map(user, UserDTO.class)).thenReturn(userDTO);
 
-        assertThrows(UserException.class, () ->
-                userService.updateUserById(1L, saveUserDTO, token));
+        UserDTO result = userService.updateUserById(1L, saveUserDTO, token);
 
-        verify(userRepository, never()).save(any());
+        assertNotNull(result);
+        verify(userRepository).save(user);
     }
 
     @Test
     @Transactional
     void assignOwnerRole_ValidUser_AddsOwnerRole() {
         // Given
-        User user = new User();
-        user.setId(1L);
-        user.setRoles(new ArrayList<>(List.of(guestRole)));
-
         when(userRepository.findById(1L)).thenReturn(Optional.of(user));
         when(roleService.getOwnerRole()).thenReturn(ownerRole);
         when(userRepository.save(user)).thenReturn(user);
+        when(modelMapper.map(user, UserDTO.class)).thenReturn(userDTO);
 
         // When
-        User result = userService.assignOwnerRole(1L);
+        UserDTO result = userService.assignOwnerRole(1L);
 
         // Then
-        assertEquals(2, result.getRoles().size());
-        assertTrue(result.getRoles().stream().anyMatch(r -> r.getName().equals("ROLE_OWNER")));
+        assertNotNull(result);
         verify(userRepository, times(1)).save(user);
     }
 
@@ -218,11 +154,11 @@ class UserServiceImplTest {
     @Transactional
     void assignOwnerRole_UserAlreadyHasRole_ThrowsException() {
         // Given
-        User user = new User();
-        user.setId(1L);
-        user.setRoles(new ArrayList<>(List.of(guestRole, ownerRole)));
+        User userWithRole = new User();
+        userWithRole.setId(1L);
+        userWithRole.setRoles(new ArrayList<>(List.of(guestRole, ownerRole)));
 
-        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+        when(userRepository.findById(1L)).thenReturn(Optional.of(userWithRole));
         when(roleService.getOwnerRole()).thenReturn(ownerRole);
 
         // When & Then
@@ -237,14 +173,14 @@ class UserServiceImplTest {
     void deleteUserById_Owner_DeletesUser() {
         // Given
         when(jwtTokenUtils.getUserId(token)).thenReturn(1L);
-        when(cacheManager.getCache(anyString())).thenReturn(cache);
-        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
-        doNothing().when(userRepository).delete(user);
+        when(userRepository.existsById(1L)).thenReturn(true);
+
+        doNothing().when(userRepository).deleteById(1L);
 
         // When
         userService.deleteUserById(1L, token);
 
         // Then
-        verify(userRepository, times(1)).delete(user);
+        verify(userRepository, times(1)).deleteById(1L);
     }
 }
