@@ -121,7 +121,6 @@ services:
       - discovery-server
       - postgres-review
       - api-gateway
-      - redis
     environment:
       - SPRING_PROFILES_ACTIVE=docker
       - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres-review:5432/review_service_db

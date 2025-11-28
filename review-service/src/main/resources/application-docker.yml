@@ -13,12 +13,6 @@ spring:
       value-serializer: io.confluent.kafka.serializers.KafkaAvroSerializer
       properties:
         schema.registry.url: http://schema-registry:8081
-  data:
-    redis:
-      host: redis
-      port: 6379
-  cache:
-    type: redis
 
 eureka:
   client:
