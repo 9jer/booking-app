@@ -7,10 +7,15 @@ import com.example.bookingservice.services.BookingService;
 import com.example.bookingservice.util.BookingErrorResponse;
 import com.example.bookingservice.util.BookingException;
 import com.example.bookingservice.util.ErrorsUtil;
+import io.swagger.v3.oas.annotations.Parameter;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -30,16 +35,17 @@ public class BookingController {
     private String rootEndpointUri;
 
     @GetMapping
-    public ResponseEntity<BookingsResponse> getAllBookings(@RequestHeader("Authorization") String authorizationHeader){
+    public ResponseEntity<Page<GetBookingDTO>> getAllBookings(@Parameter(hidden = true) @RequestHeader("Authorization") String authorizationHeader,
+                                                              @PageableDefault(size = 10, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable){
         String jwtToken = authorizationHeader.replace("Bearer ", "");
         return ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_JSON)
-                .body(new BookingsResponse(bookingService.getAllBookings(jwtToken)));
+                .body(bookingService.getAllBookings(jwtToken, pageable));
     }
 
     @GetMapping(path = "${application.endpoint.id}")
     public ResponseEntity<GetBookingDTO> getBookingById(@PathVariable("id") Long id,
-                                                        @RequestHeader("Authorization") String authorizationHeader){
+                                                        @Parameter(hidden = true) @RequestHeader("Authorization") String authorizationHeader){
         String jwtToken = authorizationHeader.replace("Bearer ", "");
         return ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_JSON)
@@ -47,12 +53,15 @@ public class BookingController {
     }
 
     @GetMapping("/property/{id}")
-    public ResponseEntity<BookingsResponse> getBookingsByPropertyId(@PathVariable("id") Long propertyId,
-                                                                    @RequestHeader("Authorization") String authorizationHeader){
+    public ResponseEntity<Page<GetBookingDTO>> getBookingsByPropertyId(
+            @PathVariable("id") Long propertyId,
+            @Parameter(hidden = true) @RequestHeader("Authorization") String authorizationHeader,
+            @PageableDefault(size = 10, sort = "checkInDate", direction = Sort.Direction.DESC) Pageable pageable){
+
         String jwtToken = authorizationHeader.replace("Bearer ", "");
         return ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_JSON)
-                .body(new BookingsResponse(bookingService.getBookingByPropertyId(propertyId, jwtToken)));
+                .body(bookingService.getBookingByPropertyId(propertyId, jwtToken, pageable));
     }
 
     @GetMapping(path = "${application.endpoint.booking-history-by-id}")
@@ -63,7 +72,7 @@ public class BookingController {
     }
 
     @PostMapping
-    public ResponseEntity<GetBookingDTO> createBooking(@RequestHeader("Authorization") String authorizationHeader,
+    public ResponseEntity<GetBookingDTO> createBooking(@Parameter(hidden = true) @RequestHeader("Authorization") String authorizationHeader,
                                                  @RequestBody @Valid BookingDTO bookingDTO, BindingResult bindingResult){
         Booking booking = convertBookingDTOToBooking(bookingDTO);
 
@@ -83,7 +92,7 @@ public class BookingController {
 
     @PatchMapping(path = "${application.endpoint.booking-status}")
     public ResponseEntity<GetBookingDTO> updateBookingStatus(
-            @RequestHeader("Authorization") String authorizationHeader,
+            @Parameter(hidden = true) @RequestHeader("Authorization") String authorizationHeader,
             @PathVariable Long id,
             @RequestParam BookingStatus status) {
 

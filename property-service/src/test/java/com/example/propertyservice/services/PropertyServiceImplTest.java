@@ -2,7 +2,6 @@ package com.example.propertyservice.services;
 
 import com.example.propertyservice.client.BookingClient;
 import com.example.propertyservice.client.UserClient;
-import com.example.propertyservice.dto.AvailableDatesResponse;
 import com.example.propertyservice.dto.GetPropertyDTO;
 import com.example.propertyservice.models.Property;
 import com.example.propertyservice.models.PropertyFeature;
@@ -17,6 +16,10 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.modelmapper.ModelMapper;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
@@ -80,16 +83,17 @@ class PropertyServiceImplTest {
     @Test
     void findAll_ReturnsListOfDTOs() {
         // Given
-        when(propertyRepository.findAll()).thenReturn(List.of(property));
+        Pageable pageable = PageRequest.of(0, 10);
+        when(propertyRepository.findAll(pageable)).thenReturn(new PageImpl<>(List.of(property)));
         when(modelMapper.map(property, GetPropertyDTO.class)).thenReturn(getPropertyDTO);
 
         // When
-        List<GetPropertyDTO> result = propertyService.findAll();
+        Page<GetPropertyDTO> result = propertyService.findAll(pageable);
 
         // Then
-        assertEquals(1, result.size());
-        assertEquals(getPropertyDTO.getId(), result.get(0).getId());
-        verify(propertyRepository, times(1)).findAll();
+        assertEquals(1, result.getTotalElements());
+        assertEquals(getPropertyDTO.getId(), result.getContent().get(0).getId());
+        verify(propertyRepository, times(1)).findAll(pageable);
     }
 
     @Test
@@ -181,18 +185,20 @@ class PropertyServiceImplTest {
         String location = "Test";
         BigDecimal minPrice = BigDecimal.valueOf(50);
         BigDecimal maxPrice = BigDecimal.valueOf(150);
-        when(propertyRepository.searchProperties(location, minPrice, maxPrice))
-                .thenReturn(List.of(property));
+        Pageable pageable = PageRequest.of(0, 10);
+
+        when(propertyRepository.searchProperties(eq(location), eq(minPrice), eq(maxPrice), eq(pageable)))
+                .thenReturn(new PageImpl<>(List.of(property)));
         when(modelMapper.map(property, GetPropertyDTO.class)).thenReturn(getPropertyDTO);
 
         // When
-        List<GetPropertyDTO> result = propertyService.search(location, minPrice, maxPrice);
+        Page<GetPropertyDTO> result = propertyService.search(location, minPrice, maxPrice, pageable);
 
         // Then
-        assertEquals(1, result.size());
-        assertEquals(getPropertyDTO.getId(), result.get(0).getId());
+        assertEquals(1, result.getTotalElements());
+        assertEquals(getPropertyDTO.getId(), result.getContent().get(0).getId());
         verify(propertyRepository, times(1))
-                .searchProperties(location, minPrice, maxPrice);
+                .searchProperties(location, minPrice, maxPrice, pageable);
     }
 
     @Test

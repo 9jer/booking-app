@@ -15,6 +15,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
@@ -90,14 +92,15 @@ class BookingControllerIT {
 
     @Test
     void getAllBookings_ShouldReturnListOfBookings() throws Exception {
-        Mockito.when(bookingService.getAllBookings(anyString())).thenReturn(List.of(testGetBookingDTO));
+        Mockito.when(bookingService.getAllBookings(anyString(), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(testGetBookingDTO)));
 
         mockMvc.perform(MockMvcRequestBuilders.get(ROOT_ENDPOINT)
                         .header("Authorization", "Bearer " + validToken)
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.bookings[0].id").value(testGetBookingDTO.getId()))
-                .andExpect(jsonPath("$.bookings[0].propertyId").value(testGetBookingDTO.getPropertyId()));
+                .andExpect(jsonPath("$.content[0].id").value(testGetBookingDTO.getId()))
+                .andExpect(jsonPath("$.content[0].propertyId").value(testGetBookingDTO.getPropertyId()));
     }
 
     @Test

@@ -11,6 +11,9 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.modelmapper.ModelMapper;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -142,18 +145,19 @@ class PropertyControllerTest {
     @Test
     void getAllProperties_ReturnsPropertiesResponse() {
         // Given
-        when(propertyService.findAll()).thenReturn(Collections.singletonList(getPropertyDTO));
+        when(propertyService.findAll(any(Pageable.class)))
+                .thenReturn(new PageImpl<>(Collections.singletonList(getPropertyDTO)));
 
         // When
-        ResponseEntity<PropertiesResponse> response = propertyController.getAllProperties();
+        ResponseEntity<Page<GetPropertyDTO>> response = propertyController.getAllProperties(Pageable.unpaged());
 
         // Then
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertNotNull(response.getBody());
-        assertEquals(1, response.getBody().getProperties().size());
-        assertEquals(getPropertyDTO, response.getBody().getProperties().get(0));
+        assertEquals(1, response.getBody().getTotalElements());
+        assertEquals(getPropertyDTO, response.getBody().getContent().get(0));
 
-        verify(propertyService, times(1)).findAll();
+        verify(propertyService, times(1)).findAll(any(Pageable.class));
     }
 
     @Test
@@ -178,18 +182,19 @@ class PropertyControllerTest {
         String location = "Test";
         BigDecimal minPrice = BigDecimal.valueOf(50);
         BigDecimal maxPrice = BigDecimal.valueOf(150);
-        when(propertyService.search(location, minPrice, maxPrice)).thenReturn(Collections.singletonList(getPropertyDTO));
+        when(propertyService.search(eq(location), eq(minPrice), eq(maxPrice), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(Collections.singletonList(getPropertyDTO)));
 
         // When
-        ResponseEntity<PropertiesResponse> response = propertyController.searchProperties(location, minPrice, maxPrice);
+        ResponseEntity<Page<GetPropertyDTO>> response = propertyController.searchProperties(location, minPrice, maxPrice, Pageable.unpaged());
 
         // Then
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertNotNull(response.getBody());
-        assertEquals(1, response.getBody().getProperties().size());
-        assertEquals(getPropertyDTO, response.getBody().getProperties().get(0));
+        assertEquals(1, response.getBody().getTotalElements());
+        assertEquals(getPropertyDTO, response.getBody().getContent().get(0));
 
-        verify(propertyService, times(1)).search(location, minPrice, maxPrice);
+        verify(propertyService, times(1)).search(eq(location), eq(minPrice), eq(maxPrice), any(Pageable.class));
     }
 
     @Test

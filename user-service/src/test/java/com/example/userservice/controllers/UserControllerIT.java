@@ -14,6 +14,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -76,13 +78,14 @@ class UserControllerIT {
 
     @Test
     void getAllUsers_ShouldReturnListOfUsers() throws Exception {
-        Mockito.when(userService.findAll()).thenReturn(List.of(testUserDTO));
+        Mockito.when(userService.findAll(any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(testUserDTO)));
 
         mockMvc.perform(get(USERS_ROOT_ENDPOINT)
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.users[0].id").value(testUserDTO.getId()))
-                .andExpect(jsonPath("$.users[0].username").value(testUserDTO.getUsername()));
+                .andExpect(jsonPath("$.content[0].id").value(testUserDTO.getId()))
+                .andExpect(jsonPath("$.content[0].username").value(testUserDTO.getUsername()));
     }
 
     @Test

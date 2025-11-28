@@ -2,7 +2,6 @@ package com.example.reviewservice.controllers;
 
 import com.example.reviewservice.dto.GetReviewDTO;
 import com.example.reviewservice.dto.ReviewDTO;
-import com.example.reviewservice.dto.ReviewsResponse;
 import com.example.reviewservice.models.Review;
 import com.example.reviewservice.services.ReviewService;
 import org.junit.jupiter.api.BeforeEach;
@@ -12,6 +11,9 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.modelmapper.ModelMapper;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.BindingResult;
@@ -67,19 +69,20 @@ class ReviewControllerTest {
     @Test
     void getReviewsByPropertyId_ReturnsReviewsResponse() {
         // Given
-        when(reviewService.getReviewsByPropertyId(1L)).thenReturn(Collections.singletonList(getReviewDTO));
+        when(reviewService.getReviewsByPropertyId(eq(1L), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(Collections.singletonList(getReviewDTO)));
 
         // When
-        ResponseEntity<ReviewsResponse> response = reviewController.getReviewsByPropertyId(1L);
+        ResponseEntity<Page<GetReviewDTO>> response = reviewController.getReviewsByPropertyId(1L, Pageable.unpaged());
 
         // Then
         assertEquals(200, response.getStatusCodeValue());
         assertEquals(MediaType.APPLICATION_JSON, response.getHeaders().getContentType());
         assertNotNull(response.getBody());
-        assertEquals(1, response.getBody().getReviews().size());
-        assertEquals(getReviewDTO, response.getBody().getReviews().get(0));
+        assertEquals(1, response.getBody().getTotalElements());
+        assertEquals(getReviewDTO, response.getBody().getContent().get(0));
 
-        verify(reviewService, times(1)).getReviewsByPropertyId(1L);
+        verify(reviewService, times(1)).getReviewsByPropertyId(eq(1L), any(Pageable.class));
     }
 
     @Test

@@ -2,13 +2,16 @@ package com.example.userservice.controllers;
 
 import com.example.userservice.dto.SaveUserDTO;
 import com.example.userservice.dto.UserDTO;
-import com.example.userservice.dto.UsersResponse;
 import com.example.userservice.services.UserService;
 import com.example.userservice.util.ErrorResponse;
 import com.example.userservice.util.ErrorsUtil;
 import com.example.userservice.util.UserException;
+import io.swagger.v3.oas.annotations.Parameter;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -24,14 +27,15 @@ public class UserController {
     private final UserService userService;
 
     @GetMapping
-    public ResponseEntity<UsersResponse> getAllUsers() {
+    public ResponseEntity<Page<UserDTO>> getAllUsers(
+            @PageableDefault(size = 20, sort = "id") Pageable pageable) {
         return ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_JSON)
-                .body(new UsersResponse(userService.findAll()));
+                .body(userService.findAll(pageable));
     }
 
     @PatchMapping(path = "${application.endpoint.users.id}")
-    public ResponseEntity<UserDTO> updateUser(@RequestHeader("Authorization") String authorizationHeader,
+    public ResponseEntity<UserDTO> updateUser(@Parameter(hidden = true) @RequestHeader("Authorization") String authorizationHeader,
                                               @PathVariable("id") Long id, @RequestBody @Valid SaveUserDTO saveUserDTO, BindingResult bindingResult) {
 
         if(bindingResult.hasErrors()) {
@@ -46,7 +50,7 @@ public class UserController {
     }
 
     @DeleteMapping(path = "${application.endpoint.users.id}")
-    public ResponseEntity<HttpStatus> deleteUser(@RequestHeader("Authorization") String authorizationHeader,
+    public ResponseEntity<HttpStatus> deleteUser(@Parameter(hidden = true) @RequestHeader("Authorization") String authorizationHeader,
                                                  @PathVariable("id") Long id) {
         String jwtToken = authorizationHeader.replace("Bearer ", "");
         userService.deleteUserById(id, jwtToken);

@@ -2,16 +2,19 @@ package com.example.propertyservice.controllers;
 
 import com.example.propertyservice.dto.AvailableDatesResponse;
 import com.example.propertyservice.dto.GetPropertyDTO;
-import com.example.propertyservice.dto.PropertiesResponse;
 import com.example.propertyservice.dto.PropertyDTO;
 import com.example.propertyservice.models.Property;
 import com.example.propertyservice.services.PropertyService;
 import com.example.propertyservice.util.ErrorsUtil;
 import com.example.propertyservice.util.PropertyErrorResponse;
 import com.example.propertyservice.util.PropertyException;
+import io.swagger.v3.oas.annotations.Parameter;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.modelmapper.ModelMapper;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -20,7 +23,6 @@ import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.util.List;
 
 @RestController
 @RequestMapping("${application.endpoint.root}")
@@ -31,7 +33,7 @@ public class PropertyController {
     private final ModelMapper modelMapper;
 
     @PostMapping
-    public ResponseEntity<GetPropertyDTO> createProperty(@RequestHeader("Authorization") String authorizationHeader,
+    public ResponseEntity<GetPropertyDTO> createProperty(@Parameter(hidden = true) @RequestHeader("Authorization") String authorizationHeader,
                                                          @RequestBody @Valid PropertyDTO propertyDTO, BindingResult bindingResult) {
         if(bindingResult.hasErrors()) {
             ErrorsUtil.returnAllErrors(bindingResult);
@@ -48,7 +50,7 @@ public class PropertyController {
     }
 
     @PatchMapping(path = "${application.endpoint.id}")
-    public ResponseEntity<GetPropertyDTO> updateProperty(@RequestHeader("Authorization") String authorizationHeader,
+    public ResponseEntity<GetPropertyDTO> updateProperty(@Parameter(hidden = true) @RequestHeader("Authorization") String authorizationHeader,
                                                          @PathVariable("id") Long id, @RequestBody @Valid PropertyDTO propertyDTO, BindingResult bindingResult) {
         if(bindingResult.hasErrors()) {
             ErrorsUtil.returnAllErrors(bindingResult);
@@ -64,7 +66,7 @@ public class PropertyController {
 
     @DeleteMapping(path = "${application.endpoint.id}")
     public ResponseEntity<HttpStatus> deleteProperty(@PathVariable("id") Long id,
-                                                     @RequestHeader("Authorization") String authorizationHeader) {
+                                                     @Parameter(hidden = true) @RequestHeader("Authorization") String authorizationHeader) {
         String jwtToken = authorizationHeader.replace("Bearer ", "");
         propertyService.delete(id, jwtToken);
 
@@ -72,10 +74,10 @@ public class PropertyController {
     }
 
     @GetMapping
-    public ResponseEntity<PropertiesResponse> getAllProperties() {
+    public ResponseEntity<Page<GetPropertyDTO>> getAllProperties(@PageableDefault(size = 10) Pageable pageable) {
         return ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_JSON)
-                .body(new PropertiesResponse(propertyService.findAll()));
+                .body(propertyService.findAll(pageable));
     }
 
     @GetMapping(path = "${application.endpoint.id}")
@@ -86,16 +88,15 @@ public class PropertyController {
     }
 
     @GetMapping(path = "${application.endpoint.search}")
-    public ResponseEntity<PropertiesResponse> searchProperties(
+    public ResponseEntity<Page<GetPropertyDTO>> searchProperties(
             @RequestParam(required = false) String location,
             @RequestParam(required = false) BigDecimal minPrice,
-            @RequestParam(required = false) BigDecimal maxPrice) {
-
-        List<GetPropertyDTO> properties = propertyService.search(location, minPrice, maxPrice);
+            @RequestParam(required = false) BigDecimal maxPrice,
+            @PageableDefault(size = 10, sort = "id") Pageable pageable) {
 
         return ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_JSON)
-                .body(new PropertiesResponse(properties));
+                .body(propertyService.search(location, minPrice, maxPrice, pageable));
     }
 
 

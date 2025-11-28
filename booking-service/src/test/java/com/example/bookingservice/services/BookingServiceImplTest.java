@@ -19,8 +19,13 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.modelmapper.ModelMapper;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
@@ -59,6 +64,7 @@ class BookingServiceImplTest {
     private ModelMapper modelMapper;
 
     @InjectMocks
+    @Spy
     private BookingServiceImpl bookingService;
 
     private Booking booking;
@@ -93,17 +99,18 @@ class BookingServiceImplTest {
     @Test
     void getAllBookings_Admin_ReturnsListOfDTOs() {
         // Given
+        Pageable pageable = PageRequest.of(0, 10);
         when(jwtTokenUtils.getRoles(token)).thenReturn(List.of("ROLE_ADMIN"));
-        when(bookingRepository.findAll()).thenReturn(Collections.singletonList(booking));
+        when(bookingRepository.findAll(pageable)).thenReturn(new PageImpl<>(Collections.singletonList(booking)));
         when(modelMapper.map(booking, GetBookingDTO.class)).thenReturn(getBookingDTO);
 
         // When
-        List<GetBookingDTO> result = bookingService.getAllBookings(token);
+        Page<GetBookingDTO> result = bookingService.getAllBookings(token, pageable);
 
         // Then
-        assertEquals(1, result.size());
-        assertEquals(getBookingDTO, result.get(0));
-        verify(bookingRepository, times(1)).findAll();
+        assertEquals(1, result.getTotalElements());
+        assertEquals(getBookingDTO, result.getContent().get(0));
+        verify(bookingRepository, times(1)).findAll(pageable);
     }
 
     @Test
@@ -140,20 +147,22 @@ class BookingServiceImplTest {
         // Given
         GetPropertyDTO propertyDTO = new GetPropertyDTO();
         propertyDTO.setOwnerId(1L);
+        Pageable pageable = PageRequest.of(0, 10);
 
         when(jwtTokenUtils.getRoles(token)).thenReturn(List.of("ROLE_OWNER"));
         when(jwtTokenUtils.getUserId(token)).thenReturn(1L);
         when(propertyClient.getPropertyById(1L)).thenReturn(propertyDTO);
-        when(bookingRepository.findByPropertyId(1L)).thenReturn(Collections.singletonList(booking));
+
+        when(bookingRepository.findByPropertyId(1L, pageable)).thenReturn(new PageImpl<>(Collections.singletonList(booking)));
         when(modelMapper.map(booking, GetBookingDTO.class)).thenReturn(getBookingDTO);
 
         // When
-        List<GetBookingDTO> result = bookingService.getBookingByPropertyId(1L, token);
+        Page<GetBookingDTO> result = bookingService.getBookingByPropertyId(1L, token, pageable);
 
         // Then
-        assertEquals(1, result.size());
-        assertEquals(getBookingDTO, result.get(0));
-        verify(bookingRepository, times(1)).findByPropertyId(1L);
+        assertEquals(1, result.getTotalElements());
+        assertEquals(getBookingDTO, result.getContent().get(0));
+        verify(bookingRepository, times(1)).findByPropertyId(1L, pageable);
     }
 
     @Test
@@ -177,6 +186,11 @@ class BookingServiceImplTest {
         // Given
         GetPropertyDTO propertyDTO = new GetPropertyDTO();
         propertyDTO.setTitle("Test Property");
+
+        doAnswer(invocation -> {
+            ((Runnable) invocation.getArgument(0)).run();
+            return null;
+        }).when(bookingService).executeAfterCommit(any());
 
         when(propertyClient.propertyExists(1L)).thenReturn(true);
         when(jwtTokenUtils.getUserId(token)).thenReturn(1L);
@@ -339,9 +353,9 @@ class BookingServiceImplTest {
     @Test
     void getAvailableDates_NoBookings_ReturnsAllDates() {
         // Given
-        when(propertyClient.propertyExists(1L)).thenReturn(true);
         when(bookingRepository.findFutureBookings(eq(1L), any(LocalDate.class)))
                 .thenReturn(Collections.emptyList());
+        when(propertyClient.propertyExists(1L)).thenReturn(true);
 
         LocalDate today = LocalDate.now();
         LocalDate endDate = today.plusMonths(3);
@@ -369,9 +383,9 @@ class BookingServiceImplTest {
         booking2.setCheckInDate(LocalDate.now().plusDays(10));
         booking2.setCheckOutDate(LocalDate.now().plusDays(12));
 
-        when(propertyClient.propertyExists(1L)).thenReturn(true);
         when(bookingRepository.findFutureBookings(eq(1L), any(LocalDate.class)))
                 .thenReturn(List.of(booking1, booking2));
+        when(propertyClient.propertyExists(1L)).thenReturn(true);
 
         // When
         List<LocalDate> result = bookingService.getAvailableDates(1L);

@@ -15,6 +15,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -78,13 +80,13 @@ class ReviewControllerIT {
 
     @Test
     void getReviewsByPropertyId_ShouldReturnReviews() throws Exception {
-        Mockito.when(reviewService.getReviewsByPropertyId(anyLong()))
-                .thenReturn(List.of(testGetReviewDTO));
+        Mockito.when(reviewService.getReviewsByPropertyId(anyLong(), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(testGetReviewDTO)));
 
         mockMvc.perform(get(REVIEWS_BY_PROPERTY_ENDPOINT, 1L)
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.reviews[0].id").value(testGetReviewDTO.getId()));
+                .andExpect(jsonPath("$.content[0].id").value(testGetReviewDTO.getId()));
     }
 
     @Test

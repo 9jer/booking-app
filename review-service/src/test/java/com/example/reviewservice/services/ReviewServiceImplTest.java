@@ -12,8 +12,13 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.modelmapper.ModelMapper;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
@@ -49,6 +54,7 @@ class ReviewServiceImplTest {
     private ModelMapper modelMapper;
 
     @InjectMocks
+    @Spy
     private ReviewServiceImpl reviewService;
 
     private Review review;
@@ -73,21 +79,28 @@ class ReviewServiceImplTest {
     @Test
     void getReviewsByPropertyId_ReturnsReviewsList() {
         // Given
-        when(reviewRepository.findByPropertyId(1L)).thenReturn(List.of(review));
+        Pageable pageable = PageRequest.of(0, 10);
+        when(reviewRepository.findByPropertyId(eq(1L), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(review)));
         when(modelMapper.map(review, GetReviewDTO.class)).thenReturn(getReviewDTO);
 
         // When
-        List<GetReviewDTO> result = reviewService.getReviewsByPropertyId(1L);
+        Page<GetReviewDTO> result = reviewService.getReviewsByPropertyId(1L, pageable);
 
         // Then
-        assertEquals(1, result.size());
-        assertEquals(getReviewDTO, result.get(0));
-        verify(reviewRepository, times(1)).findByPropertyId(1L);
+        assertEquals(1, result.getTotalElements());
+        assertEquals(getReviewDTO, result.getContent().get(0));
+        verify(reviewRepository, times(1)).findByPropertyId(1L, pageable);
     }
 
     @Test
     @Transactional
     void saveReview_ValidReview_SavesAndReturnsReview() {
+        doAnswer(invocation -> {
+            ((Runnable) invocation.getArgument(0)).run();
+            return null;
+        }).when(reviewService).executeAfterCommit(any());
+
         // Given
         Review newReview = new Review();
         newReview.setPropertyId(1L);
@@ -115,6 +128,11 @@ class ReviewServiceImplTest {
     @Test
     @Transactional
     void updateReview_Owner_UpdatesReview() {
+        doAnswer(invocation -> {
+            ((Runnable) invocation.getArgument(0)).run();
+            return null;
+        }).when(reviewService).executeAfterCommit(any());
+
         // Given
         Review updatedReviewInput = new Review();
         updatedReviewInput.setId(1L);
@@ -148,6 +166,11 @@ class ReviewServiceImplTest {
     @Test
     @Transactional
     void deleteReview_Owner_DeletesReview() {
+        doAnswer(invocation -> {
+            ((Runnable) invocation.getArgument(0)).run();
+            return null;
+        }).when(reviewService).executeAfterCommit(any());
+
         // Given
         when(reviewRepository.findById(1L)).thenReturn(Optional.of(review));
         when(jwtTokenUtils.getUserId(validToken)).thenReturn(1L);

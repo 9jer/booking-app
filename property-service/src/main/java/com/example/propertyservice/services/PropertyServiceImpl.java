@@ -15,6 +15,8 @@ import org.modelmapper.ModelMapper;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.CachePut;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -38,10 +40,9 @@ public class PropertyServiceImpl implements PropertyService {
     private final ModelMapper modelMapper;
 
     @Override
-    public List<GetPropertyDTO> findAll(){
-        return propertyRepository.findAll().stream()
-                .map(this::convertToGetPropertyDTO)
-                .collect(Collectors.toList());
+    public Page<GetPropertyDTO> findAll(Pageable pageable){
+        return propertyRepository.findAll(pageable)
+                .map(this::convertToGetPropertyDTO);
     }
 
     @Override
@@ -123,10 +124,9 @@ public class PropertyServiceImpl implements PropertyService {
     }
 
     @Override
-    public List<GetPropertyDTO> search(String location, BigDecimal minPrice, BigDecimal maxPrice) {
-        return propertyRepository.searchProperties(location, minPrice, maxPrice).stream()
-                .map(this::convertToGetPropertyDTO)
-                .collect(Collectors.toList());
+    public Page<GetPropertyDTO> search(String location, BigDecimal minPrice, BigDecimal maxPrice, Pageable pageable) {
+        return propertyRepository.searchProperties(location, minPrice, maxPrice, pageable)
+                .map(this::convertToGetPropertyDTO);
     }
 
     private Set<PropertyFeature> findOrCreatePropertyFeature(Property property) {

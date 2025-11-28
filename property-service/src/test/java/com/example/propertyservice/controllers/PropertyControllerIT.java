@@ -15,6 +15,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -106,13 +108,14 @@ class PropertyControllerIT {
 
     @Test
     void getAllProperties_ShouldReturnListOfProperties() throws Exception {
-        Mockito.when(propertyService.findAll()).thenReturn(List.of(testGetPropertyDTO));
+        Mockito.when(propertyService.findAll(any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(testGetPropertyDTO)));
 
         mockMvc.perform(get(ROOT_ENDPOINT)
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.properties[0].id").value(testGetPropertyDTO.getId()))
-                .andExpect(jsonPath("$.properties[0].title").value(testGetPropertyDTO.getTitle()));
+                .andExpect(jsonPath("$.content[0].id").value(testGetPropertyDTO.getId()))
+                .andExpect(jsonPath("$.content[0].title").value(testGetPropertyDTO.getTitle()));
     }
 
     @Test
@@ -150,14 +153,14 @@ class PropertyControllerIT {
 
     @Test
     void searchProperties_ShouldReturnFilteredProperties() throws Exception {
-        Mockito.when(propertyService.search(any(), any(), any()))
-                .thenReturn(List.of(testGetPropertyDTO));
+        Mockito.when(propertyService.search(any(), any(), any(), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(testGetPropertyDTO)));
 
         mockMvc.perform(get(SEARCH_ENDPOINT)
                         .param("location", "Test")
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.properties[0].id").value(testGetPropertyDTO.getId()));
+                .andExpect(jsonPath("$.content[0].id").value(testGetPropertyDTO.getId()));
     }
 
     @Test

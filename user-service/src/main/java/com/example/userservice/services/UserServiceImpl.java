@@ -12,6 +12,8 @@ import org.modelmapper.ModelMapper;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.CachePut;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -37,12 +39,14 @@ public class UserServiceImpl implements UserService {
         return userRepository.findByUsername(username);
     }
 
+    @Override
     public Optional<User> findByEmail(String email) {
         return userRepository.findByEmail(email);
     }
 
     @Override
     @Transactional
+    @CachePut(value = "userById", key = "#result.id")
     public UserDTO createNewUser(User user) {
         user.setPassword(passwordEncoder.encode(user.getPassword()));
         user.setRoles(List.of(roleService.getGuestRole()));
@@ -52,10 +56,9 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    public List<UserDTO> findAll() {
-        return userRepository.findAll().stream()
-                .map(this::convertToUserDTO)
-                .collect(Collectors.toList());
+    public Page<UserDTO> findAll(Pageable pageable) {
+        return userRepository.findAll(pageable)
+                .map(this::convertToUserDTO);
     }
 
     @Override
@@ -81,21 +84,19 @@ public class UserServiceImpl implements UserService {
             throw new UserException("Incorrect password!");
         }
 
-        Optional<User> userByUsername = userRepository.findByUsername(updatedUser.getUsername());
-        Optional<User> userByEmail = userRepository.findByEmail(updatedUser.getEmail());
+        User existingUser = userRepository.findById(id).orElseThrow(() ->
+                new UserException(String.format("User %s not found", id)));
 
+        Optional<User> userByUsername = userRepository.findByUsername(updatedUser.getUsername());
         if(userByUsername.isPresent() && !userByUsername.get().getId().equals(id)) {
             throw new UserException("Username already taken");
         }
+        Optional<User> userByEmail = userRepository.findByEmail(updatedUser.getEmail());
         if(userByEmail.isPresent() && !userByEmail.get().getId().equals(id)) {
             throw new UserException("Email already taken");
         }
 
-        User existingUser = userRepository.findById(id).orElseThrow(() ->
-                new UserException(String.format("User %s not found", id)));
-
-        User user = convertSaveUserDTOToUser(updatedUser);
-        enrichPropertyForUpdate(existingUser, user);
+        enrichPropertyForUpdate(existingUser, convertSaveUserDTOToUser(updatedUser));
 
         User savedUser = userRepository.save(existingUser);
         return convertToUserDTO(savedUser);

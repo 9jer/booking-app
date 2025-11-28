@@ -10,19 +10,22 @@ import com.example.reviewservice.repositories.ReviewRepository;
 import com.example.reviewservice.util.JwtTokenUtils;
 import com.example.reviewservice.util.ReviewException;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.modelmapper.ModelMapper;
-import org.springframework.cache.annotation.CacheEvict;
-import org.springframework.cache.annotation.Cacheable;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.stream.Collectors;
 
 @Service
 @Transactional(readOnly = true)
 @RequiredArgsConstructor
+@Slf4j
 public class ReviewServiceImpl implements ReviewService {
     private final ReviewRepository reviewRepository;
     private final PropertyClient propertyClient;
@@ -33,16 +36,13 @@ public class ReviewServiceImpl implements ReviewService {
     private final ModelMapper modelMapper;
 
     @Override
-    @Cacheable(value = "reviewsByProperty", key = "#propertyId")
-    public List<GetReviewDTO> getReviewsByPropertyId(Long propertyId) {
-        return reviewRepository.findByPropertyId(propertyId).stream()
-                .map(this::convertToGetReviewDTO)
-                .collect(Collectors.toList());
+    public Page<GetReviewDTO> getReviewsByPropertyId(Long propertyId, Pageable pageable) {
+        return reviewRepository.findByPropertyId(propertyId, pageable)
+                .map(this::convertToGetReviewDTO);
     }
 
     @Override
     @Transactional
-    @CacheEvict(value = "reviewsByProperty", key = "#result.propertyId")
     public GetReviewDTO saveReview(Review review, String token) {
         review.setId(null);
         Boolean propertyExists = propertyClient.propertyExists(review.getPropertyId());
@@ -66,14 +66,19 @@ public class ReviewServiceImpl implements ReviewService {
         enrichReview(review);
         Review savedReview = reviewRepository.save(review);
 
-        ratingEventProducer.sendRatingUpdatedEvent(review.getPropertyId());
+        executeAfterCommit(() -> {
+            try {
+                ratingEventProducer.sendRatingUpdatedEvent(savedReview.getPropertyId());
+            } catch (Exception e) {
+                log.error("Failed to send rating update event for property " + savedReview.getPropertyId(), e);
+            }
+        });
 
         return convertToGetReviewDTO(savedReview);
     }
 
     @Override
     @Transactional
-    @CacheEvict(value = "reviewsByProperty", key = "#result.propertyId")
     public GetReviewDTO updateReview(Review review, String token) {
 
         Long userId = jwtTokenUtils.getUserId(token);
@@ -86,22 +91,31 @@ public class ReviewServiceImpl implements ReviewService {
             throw new ReviewException("You can only update your own reviews");
         }
 
-        review.setPropertyId(existingReview.getPropertyId());
+        if(review.getPropertyId() != null && !existingReview.getPropertyId().equals(review.getPropertyId())) {
+            throw new ReviewException("Changing the property of a review is not allowed.");
+        }
 
         existingReview.setRating(review.getRating());
         existingReview.setComment(review.getComment());
+
         enrichUpdatedReview(existingReview);
 
         Review updatedReview = reviewRepository.save(existingReview);
 
-        ratingEventProducer.sendRatingUpdatedEvent(existingReview.getPropertyId());
+        Long propertyId = existingReview.getPropertyId();
+        executeAfterCommit(() -> {
+            try {
+                ratingEventProducer.sendRatingUpdatedEvent(propertyId);
+            } catch (Exception e) {
+                log.error("Failed to send rating update event for property " + propertyId, e);
+            }
+        });
 
         return convertToGetReviewDTO(updatedReview);
     }
 
     @Override
     @Transactional
-    @CacheEvict(value = "reviewsByProperty", key = "#result.propertyId")
     public GetReviewDTO deleteReview(Long reviewId, String token) {
         Long userId = jwtTokenUtils.getUserId(token);
         List<String> roles = jwtTokenUtils.getRoles(token);
@@ -116,9 +130,24 @@ public class ReviewServiceImpl implements ReviewService {
         Long propertyId = existingReview.getPropertyId();
         reviewRepository.delete(existingReview);
 
-        ratingEventProducer.sendRatingUpdatedEvent(propertyId);
+        executeAfterCommit(() -> {
+            try {
+                ratingEventProducer.sendRatingUpdatedEvent(propertyId);
+            } catch (Exception e) {
+                log.error("Failed to send rating update event for property " + propertyId, e);
+            }
+        });
 
         return convertToGetReviewDTO(existingReview);
+    }
+
+    protected void executeAfterCommit(Runnable runnable) {
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                runnable.run();
+            }
+        });
     }
 
     private void enrichUpdatedReview(Review existingReview) {

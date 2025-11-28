@@ -2,7 +2,6 @@ package com.example.userservice.controllers;
 
 import com.example.userservice.dto.SaveUserDTO;
 import com.example.userservice.dto.UserDTO;
-import com.example.userservice.dto.UsersResponse;
 import com.example.userservice.services.UserService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -11,6 +10,9 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.modelmapper.ModelMapper;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -64,21 +66,23 @@ class UserControllerTest {
     }
 
     @Test
-    void getAllUsers_ReturnsUsersResponse() {
+    void getAllUsers_ReturnsPageOfUsers() {
         // Given
-        when(userService.findAll()).thenReturn(Collections.singletonList(userDTO));
+        when(userService.findAll(any(Pageable.class)))
+                .thenReturn(new PageImpl<>(Collections.singletonList(userDTO)));
 
         // When
-        ResponseEntity<UsersResponse> response = userController.getAllUsers();
+        ResponseEntity<Page<UserDTO>> response = userController.getAllUsers(Pageable.unpaged());
 
         // Then
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertEquals(MediaType.APPLICATION_JSON, response.getHeaders().getContentType());
         assertNotNull(response.getBody());
-        assertEquals(1, response.getBody().getUsers().size());
-        assertEquals(userDTO, response.getBody().getUsers().get(0));
 
-        verify(userService, times(1)).findAll();
+        assertEquals(1, response.getBody().getTotalElements());
+        assertEquals(userDTO, response.getBody().getContent().get(0));
+
+        verify(userService, times(1)).findAll(any(Pageable.class));
     }
 
     @Test

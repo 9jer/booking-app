@@ -13,6 +13,9 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.modelmapper.ModelMapper;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -85,19 +88,21 @@ class BookingControllerTest {
     @Test
     void getAllBookings_ReturnsValidResponseEntity() {
         // Given
-        when(bookingService.getAllBookings(anyString())).thenReturn(Collections.singletonList(getBookingDTO));
+        when(bookingService.getAllBookings(anyString(), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(Collections.singletonList(getBookingDTO)));
 
         // When
-        ResponseEntity<BookingsResponse> response = bookingController.getAllBookings(authHeader);
+        ResponseEntity<Page<GetBookingDTO>> response = bookingController.getAllBookings(authHeader, Pageable.unpaged());
 
         // Then
         assertEquals(200, response.getStatusCodeValue());
         assertEquals(MediaType.APPLICATION_JSON, response.getHeaders().getContentType());
         assertNotNull(response.getBody());
-        assertEquals(1, response.getBody().getBookings().size());
-        assertEquals(getBookingDTO, response.getBody().getBookings().get(0));
 
-        verify(bookingService, times(1)).getAllBookings(anyString());
+        assertEquals(1, response.getBody().getTotalElements());
+        assertEquals(getBookingDTO, response.getBody().getContent().get(0));
+
+        verify(bookingService, times(1)).getAllBookings(anyString(), any(Pageable.class));
         verify(modelMapper, never()).map(any(Booking.class), eq(GetBookingDTO.class));
     }
 

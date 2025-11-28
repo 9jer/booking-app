@@ -15,13 +15,21 @@ import com.example.bookingservice.repositories.BookingRepository;
 import com.example.bookingservice.util.BookingException;
 import com.example.bookingservice.util.JwtTokenUtils;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.modelmapper.ModelMapper;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.CachePut;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.dao.CannotSerializeTransactionException;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.retry.annotation.Backoff;
+import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -32,6 +40,7 @@ import java.util.stream.Collectors;
 @Service
 @Transactional(readOnly = true)
 @RequiredArgsConstructor
+@Slf4j
 public class BookingServiceImpl implements BookingService {
     private final BookingRepository bookingRepository;
     private final BookingHistoryRepository bookingHistoryRepository;
@@ -44,20 +53,18 @@ public class BookingServiceImpl implements BookingService {
     private static final int MAX_BOOKING_WINDOW_MONTHS = 3;
 
     @Override
-    public List<GetBookingDTO> getAllBookings(String token) {
+    public Page<GetBookingDTO> getAllBookings(String token, Pageable pageable) {
         List<String> roles = jwtTokenUtils.getRoles(token);
-        List<Booking> bookings;
+        Page<Booking> bookings;
 
         if (roles.contains("ROLE_ADMIN")) {
-            bookings = bookingRepository.findAll();
+            bookings = bookingRepository.findAll(pageable);
         } else {
             Long currentUserId = jwtTokenUtils.getUserId(token);
-            bookings = bookingRepository.findByUserId(currentUserId);
+            bookings = bookingRepository.findByUserId(currentUserId, pageable);
         }
 
-        return bookings.stream()
-                .map(this::convertToGetBookingDTO)
-                .collect(Collectors.toList());
+        return bookings.map(this::convertToGetBookingDTO);
     }
 
     @Override
@@ -80,7 +87,7 @@ public class BookingServiceImpl implements BookingService {
     }
 
     @Override
-    public List<GetBookingDTO> getBookingByPropertyId(Long propertyId, String token) {
+    public Page<GetBookingDTO> getBookingByPropertyId(Long propertyId, String token, Pageable pageable) {
         List<String> roles = jwtTokenUtils.getRoles(token);
         if (!roles.contains("ROLE_ADMIN")) {
             Long currentUserId = jwtTokenUtils.getUserId(token);
@@ -95,9 +102,8 @@ public class BookingServiceImpl implements BookingService {
             }
         }
 
-        return bookingRepository.findByPropertyId(propertyId).stream()
-                .map(this::convertToGetBookingDTO)
-                .collect(Collectors.toList());
+        return bookingRepository.findByPropertyId(propertyId, pageable)
+                .map(this::convertToGetBookingDTO);
     }
 
     @Override
@@ -109,6 +115,11 @@ public class BookingServiceImpl implements BookingService {
 
     @Override
     @Transactional(isolation = Isolation.SERIALIZABLE)
+    @Retryable(
+            retryFor = { CannotSerializeTransactionException.class },
+            maxAttempts = 3,
+            backoff = @Backoff(delay = 100, multiplier = 2)
+    )
     @CacheEvict(value = "availableDates", key = "#booking.propertyId")
     public GetBookingDTO createBooking(Booking booking, String token) {
         booking.setId(null);
@@ -140,9 +151,14 @@ public class BookingServiceImpl implements BookingService {
         saveHistory(savedBooking, booking.getStatus());
 
         if (savedBooking.getStatus() == BookingStatus.CONFIRMED) {
-            sendNotification(savedBooking, token);
+            executeAfterCommit(() -> {
+                try {
+                    sendNotification(savedBooking, token);
+                } catch (Exception e) {
+                    log.error("Failed to send notification for booking " + savedBooking.getId(), e);
+                }
+            });
         }
-
         return convertToGetBookingDTO(savedBooking);
     }
 
@@ -175,7 +191,13 @@ public class BookingServiceImpl implements BookingService {
         Booking updatedBooking = bookingRepository.save(booking);
 
         if (updatedBooking.getStatus() == BookingStatus.CONFIRMED) {
-            sendNotification(updatedBooking, token);
+            executeAfterCommit(() -> {
+                try {
+                    sendNotification(updatedBooking, token);
+                } catch (Exception e) {
+                    log.error("Failed to send notification for booking " + updatedBooking.getId(), e);
+                }
+            });
         }
 
         return convertToGetBookingDTO(updatedBooking);
@@ -186,7 +208,7 @@ public class BookingServiceImpl implements BookingService {
         validateBookingDates(checkIn, checkOut);
 
         Boolean propertyExists = propertyClient.propertyExists(propertyId);
-        if (propertyExists == null || !propertyExists) {
+        if (Boolean.FALSE.equals(propertyExists)) {
             throw new BookingException("Property with id " + propertyId + " not found.");
         }
 
@@ -288,11 +310,26 @@ public class BookingServiceImpl implements BookingService {
         producer.sendBookingCreatedEvent("booking-created", bookingCreatedEvent);
     }
 
+    protected void executeAfterCommit(Runnable runnable) {
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                runnable.run();
+            }
+        });
+    }
+
     private GetBookingDTO convertToGetBookingDTO(Booking booking) {
         return modelMapper.map(booking, GetBookingDTO.class);
     }
 
     private BookingHistoryDTO convertToBookingHistoryDTO(BookingHistory bookingHistory) {
-        return modelMapper.map(bookingHistory, BookingHistoryDTO.class);
+        BookingHistoryDTO dto = modelMapper.map(bookingHistory, BookingHistoryDTO.class);
+
+        if (bookingHistory.getBooking() != null) {
+            dto.setBookingId(bookingHistory.getBooking().getId());
+        }
+
+        return dto;
     }
 }

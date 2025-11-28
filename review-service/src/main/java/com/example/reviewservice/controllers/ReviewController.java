@@ -2,15 +2,19 @@ package com.example.reviewservice.controllers;
 
 import com.example.reviewservice.dto.GetReviewDTO;
 import com.example.reviewservice.dto.ReviewDTO;
-import com.example.reviewservice.dto.ReviewsResponse;
 import com.example.reviewservice.models.Review;
 import com.example.reviewservice.services.ReviewService;
 import com.example.reviewservice.util.ErrorsUtil;
 import com.example.reviewservice.util.ReviewErrorResponse;
 import com.example.reviewservice.util.ReviewException;
+import io.swagger.v3.oas.annotations.Parameter;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.modelmapper.ModelMapper;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.BindingResult;
@@ -24,14 +28,15 @@ public class ReviewController {
     private final ModelMapper modelMapper;
 
     @GetMapping(path = "${application.endpoint.reviews-by-property-id}")
-    public ResponseEntity<ReviewsResponse> getReviewsByPropertyId(@PathVariable Long id) {
+    public ResponseEntity<Page<GetReviewDTO>> getReviewsByPropertyId(@PathVariable Long id,
+                                                                     @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
         return ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_JSON)
-                .body(new ReviewsResponse(reviewService.getReviewsByPropertyId(id)));
+                .body(reviewService.getReviewsByPropertyId(id, pageable));
     }
 
     @PostMapping
-    public ResponseEntity<GetReviewDTO> createReview(@RequestHeader("Authorization") String authorizationHeader,
+    public ResponseEntity<GetReviewDTO> createReview(@Parameter(hidden = true) @RequestHeader("Authorization") String authorizationHeader,
                                                      @RequestBody @Valid ReviewDTO reviewDTO, BindingResult bindingResult) {
 
         if(bindingResult.hasErrors()) {
@@ -47,7 +52,7 @@ public class ReviewController {
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<GetReviewDTO> updateReview(@RequestHeader("Authorization") String authorizationHeader
+    public ResponseEntity<GetReviewDTO> updateReview(@Parameter(hidden = true) @RequestHeader("Authorization") String authorizationHeader
             , @PathVariable(name = "id") Long id, @RequestBody @Valid ReviewDTO reviewDTO, BindingResult bindingResult) {
 
         if(bindingResult.hasErrors()) {
@@ -64,7 +69,7 @@ public class ReviewController {
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deleteReview(@RequestHeader("Authorization") String authorizationHeader
+    public ResponseEntity<Void> deleteReview(@Parameter(hidden = true) @RequestHeader("Authorization") String authorizationHeader
             , @PathVariable(name = "id") Long id) {
         String jwtToken = authorizationHeader.replace("Bearer ", "");
         reviewService.deleteReview(id, jwtToken);
