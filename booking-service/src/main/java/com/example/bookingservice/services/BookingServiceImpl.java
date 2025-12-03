@@ -206,12 +206,6 @@ public class BookingServiceImpl implements BookingService {
     @Override
     public Boolean isAvailable(Long propertyId, LocalDate checkIn, LocalDate checkOut) {
         validateBookingDates(checkIn, checkOut);
-
-        Boolean propertyExists = propertyClient.propertyExists(propertyId);
-        if (Boolean.FALSE.equals(propertyExists)) {
-            throw new BookingException("Property with id " + propertyId + " not found.");
-        }
-
         return bookingRepository.countOverlappingBookings(propertyId, checkIn, checkOut) == 0;
     }
 
@@ -222,12 +216,7 @@ public class BookingServiceImpl implements BookingService {
 
     @Override
     @Cacheable(value = "availableDates", key = "#propertyId")
-    public List<LocalDate> getAvailableDates(Long propertyId) {
-        Boolean propertyExists = propertyClient.propertyExists(propertyId);
-        if (propertyExists == null || !propertyExists) {
-            throw new BookingException("Property with id " + propertyId + " not found.");
-        }
-
+        public List<LocalDate> getAvailableDates(Long propertyId) {
         List<Booking> bookings = bookingRepository.findFutureBookings(propertyId, LocalDate.now());
 
         List<LocalDate> availableDates = new ArrayList<>();
