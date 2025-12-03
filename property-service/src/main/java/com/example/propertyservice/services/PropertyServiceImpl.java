@@ -146,10 +146,13 @@ public class PropertyServiceImpl implements PropertyService {
         var property = propertyRepository.findById(propertyId).orElseThrow(()->
                 new PropertyException("Property not found"));
 
-        property.setAverageRating(BigDecimal.valueOf(averageRating));
-        Property savedProperty = propertyRepository.save(property);
+        BigDecimal newRating = BigDecimal.valueOf(averageRating);
 
-        return convertToGetPropertyDTO(savedProperty);
+        propertyRepository.updateRating(propertyId, newRating);
+
+        property.setAverageRating(newRating);
+
+        return convertToGetPropertyDTO(property);
     }
 
     @Override
