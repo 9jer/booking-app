@@ -6,6 +6,7 @@ import lombok.Getter;
 import lombok.Setter;
 
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.Set;
 
 @Getter
@@ -32,4 +33,6 @@ public class PropertyDTO {
     private Integer capacity;
 
     private Set<PropertyFeatureDTO> features;
+
+    private List<ImageDTO> images;
 }

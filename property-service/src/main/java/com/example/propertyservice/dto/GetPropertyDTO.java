@@ -8,6 +8,7 @@ import lombok.Setter;
 import java.io.Serial;
 import java.io.Serializable;
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.Set;
 
 @Getter
@@ -40,4 +41,6 @@ public class GetPropertyDTO implements Serializable {
     private Integer capacity;
 
     private Set<PropertyFeatureDTO> features;
+
+    private List<ImageDTO> images;
 }
