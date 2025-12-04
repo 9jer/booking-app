@@ -14,7 +14,6 @@ import com.example.bookingservice.repositories.BookingHistoryRepository;
 import com.example.bookingservice.repositories.BookingRepository;
 import com.example.bookingservice.util.BookingException;
 import com.example.bookingservice.util.JwtTokenUtils;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.modelmapper.ModelMapper;
 import org.springframework.cache.annotation.CacheEvict;
@@ -26,10 +25,12 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.retry.annotation.Backoff;
 import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Isolation;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -39,7 +40,6 @@ import java.util.stream.Collectors;
 
 @Service
 @Transactional(readOnly = true)
-@RequiredArgsConstructor
 @Slf4j
 public class BookingServiceImpl implements BookingService {
     private final BookingRepository bookingRepository;
@@ -49,8 +49,27 @@ public class BookingServiceImpl implements BookingService {
     private final JwtTokenUtils jwtTokenUtils;
     private final BookingCreatedEventProducer producer;
     private final ModelMapper modelMapper;
+    private final TransactionTemplate transactionTemplate;
 
     private static final int MAX_BOOKING_WINDOW_MONTHS = 3;
+
+    public BookingServiceImpl(BookingRepository bookingRepository,
+                              BookingHistoryRepository bookingHistoryRepository,
+                              PropertyClient propertyClient,
+                              UserClient userClient,
+                              JwtTokenUtils jwtTokenUtils,
+                              BookingCreatedEventProducer producer,
+                              ModelMapper modelMapper,
+                              PlatformTransactionManager transactionManager) {
+        this.bookingRepository = bookingRepository;
+        this.bookingHistoryRepository = bookingHistoryRepository;
+        this.propertyClient = propertyClient;
+        this.userClient = userClient;
+        this.jwtTokenUtils = jwtTokenUtils;
+        this.producer = producer;
+        this.modelMapper = modelMapper;
+        this.transactionTemplate = new TransactionTemplate(transactionManager);
+    }
 
     @Override
     public Page<GetBookingDTO> getAllBookings(String token, Pageable pageable) {
@@ -114,7 +133,7 @@ public class BookingServiceImpl implements BookingService {
     }
 
     @Override
-    @Transactional(isolation = Isolation.SERIALIZABLE)
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     @Retryable(
             retryFor = { CannotSerializeTransactionException.class },
             maxAttempts = 3,
@@ -135,40 +154,46 @@ public class BookingServiceImpl implements BookingService {
             throw new BookingException("Property with id " + booking.getPropertyId() + " not found.");
         }
 
-        booking.setUserId(jwtTokenUtils.getUserId(token));
+        Long userId = jwtTokenUtils.getUserId(token);
+        booking.setUserId(userId);
 
         Boolean userExists = userClient.userExists(booking.getUserId());
         if (userExists == null || !userExists) {
             throw new BookingException("User with id " + booking.getUserId() + " not found.");
         }
 
-        if (!isAvailable(booking.getPropertyId(), booking.getCheckInDate(), booking.getCheckOutDate())) {
-            throw new BookingException("Property is not available for selected dates.");
-        }
+        return transactionTemplate.execute(status -> {
+            if (!isAvailable(booking.getPropertyId(), booking.getCheckInDate(), booking.getCheckOutDate())) {
+                throw new BookingException("Property is not available for selected dates.");
+            }
 
-        booking.setCreatedAt(LocalDateTime.now());
-        Booking savedBooking = bookingRepository.save(booking);
-        saveHistory(savedBooking, booking.getStatus());
+            booking.setCreatedAt(LocalDateTime.now());
+            Booking savedBooking = bookingRepository.save(booking);
+            saveHistory(savedBooking, booking.getStatus());
 
-        if (savedBooking.getStatus() == BookingStatus.CONFIRMED) {
-            executeAfterCommit(() -> {
-                try {
-                    sendNotification(savedBooking, token);
-                } catch (Exception e) {
-                    log.error("Failed to send notification for booking " + savedBooking.getId(), e);
-                }
-            });
-        }
-        return convertToGetBookingDTO(savedBooking);
+            if (savedBooking.getStatus() == BookingStatus.CONFIRMED) {
+                executeAfterCommit(() -> {
+                    try {
+                        sendNotification(savedBooking, token);
+                    } catch (Exception e) {
+                        log.error("Failed to send notification for booking " + savedBooking.getId(), e);
+                    }
+                });
+            }
+            return convertToGetBookingDTO(savedBooking);
+        });
     }
 
     @Override
-    @Transactional
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     @CacheEvict(value = "availableDates", key = "#result.propertyId")
     @CachePut(value = "bookingById", key = "#bookingId")
     public GetBookingDTO updateBookingStatus(Long bookingId, BookingStatus bookingStatus, String token) {
-        Booking booking = bookingRepository.findById(bookingId)
-                .orElseThrow(() -> new BookingException("Booking not found"));
+
+        Booking booking = transactionTemplate.execute(status ->
+                bookingRepository.findById(bookingId)
+                        .orElseThrow(() -> new BookingException("Booking not found"))
+        );
 
         if (booking.getStatus() == bookingStatus) {
             return convertToGetBookingDTO(booking);
@@ -184,23 +209,26 @@ public class BookingServiceImpl implements BookingService {
             }
         }
 
-        booking.setStatus(bookingStatus);
-        booking.setUpdatedAt(LocalDateTime.now());
-        saveHistory(booking, bookingStatus);
+        return transactionTemplate.execute(status -> {
+            Booking attachedBooking = bookingRepository.findById(bookingId).orElseThrow();
 
-        Booking updatedBooking = bookingRepository.save(booking);
+            attachedBooking.setStatus(bookingStatus);
+            attachedBooking.setUpdatedAt(LocalDateTime.now());
+            saveHistory(attachedBooking, bookingStatus);
 
-        if (updatedBooking.getStatus() == BookingStatus.CONFIRMED) {
-            executeAfterCommit(() -> {
-                try {
-                    sendNotification(updatedBooking, token);
-                } catch (Exception e) {
-                    log.error("Failed to send notification for booking " + updatedBooking.getId(), e);
-                }
-            });
-        }
+            Booking updatedBooking = bookingRepository.save(attachedBooking);
 
-        return convertToGetBookingDTO(updatedBooking);
+            if (updatedBooking.getStatus() == BookingStatus.CONFIRMED) {
+                executeAfterCommit(() -> {
+                    try {
+                        sendNotification(updatedBooking, token);
+                    } catch (Exception e) {
+                        log.error("Failed to send notification for booking " + updatedBooking.getId(), e);
+                    }
+                });
+            }
+            return convertToGetBookingDTO(updatedBooking);
+        });
     }
 
     @Override
@@ -224,38 +252,39 @@ public class BookingServiceImpl implements BookingService {
         LocalDate maxDate = today.plusMonths(MAX_BOOKING_WINDOW_MONTHS);
 
         if (bookings.isEmpty()) {
-            for (LocalDate date = today; date.isBefore(maxDate); date = date.plusDays(1)) {
-                availableDates.add(date);
+            LocalDate currentDate = today;
+            while (currentDate.isBefore(maxDate)) {
+                availableDates.add(currentDate);
+                currentDate = currentDate.plusDays(1);
             }
             return availableDates;
         }
 
         LocalDate currentDate = today;
+        LocalDate firstBookingCheckIn = bookings.get(0).getCheckInDate();
 
-        if (bookings.get(0).getCheckInDate().isAfter(currentDate)) {
-            LocalDate end = bookings.get(0).getCheckInDate().minusDays(1);
-            while (!currentDate.isAfter(end) && currentDate.isBefore(maxDate)) {
-                availableDates.add(currentDate);
-                currentDate = currentDate.plusDays(1);
-            }
+        while (currentDate.isBefore(firstBookingCheckIn) && currentDate.isBefore(maxDate)) {
+            availableDates.add(currentDate);
+            currentDate = currentDate.plusDays(1);
         }
 
         for (int i = 0; i < bookings.size() - 1; i++) {
-            LocalDate endOfCurrent = bookings.get(i).getCheckOutDate().plusDays(1);
-            LocalDate startOfNext = bookings.get(i + 1).getCheckInDate().minusDays(1);
+            LocalDate currentBookingCheckOut = bookings.get(i).getCheckOutDate();
+            LocalDate nextBookingCheckIn = bookings.get(i + 1).getCheckInDate();
 
-            if (endOfCurrent.isAfter(maxDate)) break;
+            if (currentBookingCheckOut.isAfter(maxDate)) break;
 
-            while (!endOfCurrent.isAfter(startOfNext) && endOfCurrent.isBefore(maxDate)) {
-                availableDates.add(endOfCurrent);
-                endOfCurrent = endOfCurrent.plusDays(1);
+            LocalDate date = currentBookingCheckOut;
+            while (date.isBefore(nextBookingCheckIn) && date.isBefore(maxDate)) {
+                availableDates.add(date);
+                date = date.plusDays(1);
             }
         }
 
-        LocalDate lastBookingEnd = bookings.get(bookings.size() - 1).getCheckOutDate().plusDays(1);
-        while (lastBookingEnd.isBefore(maxDate)) {
-            availableDates.add(lastBookingEnd);
-            lastBookingEnd = lastBookingEnd.plusDays(1);
+        LocalDate lastBookingCheckOut = bookings.get(bookings.size() - 1).getCheckOutDate();
+        while (lastBookingCheckOut.isBefore(maxDate)) {
+            availableDates.add(lastBookingCheckOut);
+            lastBookingCheckOut = lastBookingCheckOut.plusDays(1);
         }
 
         return availableDates;

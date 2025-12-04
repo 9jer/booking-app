@@ -10,7 +10,6 @@ import com.example.propertyservice.repositories.PropertyFeatureRepository;
 import com.example.propertyservice.repositories.PropertyRepository;
 import com.example.propertyservice.util.JwtTokenUtils;
 import com.example.propertyservice.util.PropertyException;
-import lombok.RequiredArgsConstructor;
 import org.modelmapper.ModelMapper;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.CachePut;
@@ -18,7 +17,10 @@ import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -29,7 +31,6 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service("propertyServiceImpl")
-@RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class PropertyServiceImpl implements PropertyService {
     private final PropertyRepository propertyRepository;
@@ -38,6 +39,23 @@ public class PropertyServiceImpl implements PropertyService {
     private final UserClient userClient;
     private final JwtTokenUtils jwtTokenUtils;
     private final ModelMapper modelMapper;
+    private final TransactionTemplate transactionTemplate;
+
+    public PropertyServiceImpl(PropertyRepository propertyRepository,
+                               PropertyFeatureRepository propertyFeatureRepository,
+                               BookingClient bookingClient,
+                               UserClient userClient,
+                               JwtTokenUtils jwtTokenUtils,
+                               ModelMapper modelMapper,
+                               PlatformTransactionManager transactionManager) {
+        this.propertyRepository = propertyRepository;
+        this.propertyFeatureRepository = propertyFeatureRepository;
+        this.bookingClient = bookingClient;
+        this.userClient = userClient;
+        this.jwtTokenUtils = jwtTokenUtils;
+        this.modelMapper = modelMapper;
+        this.transactionTemplate = new TransactionTemplate(transactionManager);
+    }
 
     @Override
     public Page<GetPropertyDTO> findAll(Pageable pageable){
@@ -54,7 +72,7 @@ public class PropertyServiceImpl implements PropertyService {
     }
 
     @Override
-    @Transactional
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     @CachePut(value = "property", key = "#result.id")
     public GetPropertyDTO save(Property property, String token) {
         property.setOwnerId(jwtTokenUtils.getUserId(token));
@@ -66,15 +84,23 @@ public class PropertyServiceImpl implements PropertyService {
                     + " not found.");
         }
 
-        enrichPropertyForSave(property);
-        property.setId(null);
-        Property savedProperty = propertyRepository.save(property);
-
-        return convertToGetPropertyDTO(savedProperty);
+        return transactionTemplate.execute(status -> {
+            enrichPropertyForSave(property);
+            property.setId(null);
+            Property savedProperty = propertyRepository.save(property);
+            return convertToGetPropertyDTO(savedProperty);
+        });
     }
 
     private void enrichPropertyForSave(Property property) {
         property.setFeatures(findOrCreatePropertyFeature(property));
+
+        if (property.getImages() != null) {
+            for (var image : property.getImages()) {
+                image.setProperty(property);
+            }
+        }
+
         property.setCreatedAt(LocalDateTime.now());
     }
 
@@ -106,19 +132,28 @@ public class PropertyServiceImpl implements PropertyService {
         existingProperty.setCapacity(updatedProperty.getCapacity());
 
         Set<PropertyFeature> updatedFeatures = findOrCreatePropertyFeature(updatedProperty);
-
         existingProperty.getFeatures().clear();
         existingProperty.getFeatures().addAll(updatedFeatures);
+
+        if (updatedProperty.getImages() != null) {
+            existingProperty.getImages().clear();
+            for (var image : updatedProperty.getImages()) {
+                image.setProperty(existingProperty);
+                existingProperty.getImages().add(image);
+            }
+        }
 
         existingProperty.setUpdatedAt(LocalDateTime.now());
     }
 
     @Override
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public Boolean isPropertyAvailable(Long propertyId, LocalDate checkIn, LocalDate checkOut) {
         return bookingClient.isAvailable(propertyId, checkIn, checkOut);
     }
 
     @Override
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public List<LocalDate> getAvailableDates(Long propertyId) {
         return bookingClient.getAvailableDates(propertyId).getAvailableDates();
     }

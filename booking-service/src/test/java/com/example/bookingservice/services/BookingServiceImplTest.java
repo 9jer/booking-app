@@ -26,6 +26,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
@@ -62,6 +63,9 @@ class BookingServiceImplTest {
 
     @Mock
     private ModelMapper modelMapper;
+
+    @Mock
+    private PlatformTransactionManager transactionManager;
 
     @InjectMocks
     @Spy
@@ -288,7 +292,6 @@ class BookingServiceImplTest {
     @Test
     void isAvailable_ValidDates_ReturnsTrue() {
         // Given
-        when(propertyClient.propertyExists(1L)).thenReturn(true);
         when(bookingRepository.countOverlappingBookings(1L,
                 LocalDate.now().plusDays(1), LocalDate.now().plusDays(3)))
                 .thenReturn(0L);
@@ -309,19 +312,6 @@ class BookingServiceImplTest {
                         LocalDate.now().plusDays(3), LocalDate.now().plusDays(1)));
 
         assertEquals("Check-in date must be before check-out date.", exception.getMessage());
-    }
-
-    @Test
-    void isAvailable_PropertyNotExists_ThrowsException() {
-        // Given
-        when(propertyClient.propertyExists(1L)).thenReturn(false);
-
-        // When & Then
-        BookingException exception = assertThrows(BookingException.class,
-                () -> bookingService.isAvailable(1L,
-                        LocalDate.now().plusDays(1), LocalDate.now().plusDays(3)));
-
-        assertEquals("Property with id 1 not found.", exception.getMessage());
     }
 
     @Test
@@ -355,7 +345,6 @@ class BookingServiceImplTest {
         // Given
         when(bookingRepository.findFutureBookings(eq(1L), any(LocalDate.class)))
                 .thenReturn(Collections.emptyList());
-        when(propertyClient.propertyExists(1L)).thenReturn(true);
 
         LocalDate today = LocalDate.now();
         LocalDate endDate = today.plusMonths(3);
@@ -385,7 +374,6 @@ class BookingServiceImplTest {
 
         when(bookingRepository.findFutureBookings(eq(1L), any(LocalDate.class)))
                 .thenReturn(List.of(booking1, booking2));
-        when(propertyClient.propertyExists(1L)).thenReturn(true);
 
         // When
         List<LocalDate> result = bookingService.getAvailableDates(1L);
@@ -398,6 +386,4 @@ class BookingServiceImplTest {
         assertTrue(result.contains(LocalDate.now().plusDays(13)));
         assertFalse(result.contains(LocalDate.now().plusDays(6)));
     }
-
-
 }

@@ -9,22 +9,23 @@ import com.example.reviewservice.models.Review;
 import com.example.reviewservice.repositories.ReviewRepository;
 import com.example.reviewservice.util.JwtTokenUtils;
 import com.example.reviewservice.util.ReviewException;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.modelmapper.ModelMapper;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
 @Transactional(readOnly = true)
-@RequiredArgsConstructor
 @Slf4j
 public class ReviewServiceImpl implements ReviewService {
     private final ReviewRepository reviewRepository;
@@ -34,6 +35,25 @@ public class ReviewServiceImpl implements ReviewService {
     private final JwtTokenUtils jwtTokenUtils;
     private final RatingEventProducer ratingEventProducer;
     private final ModelMapper modelMapper;
+    private final TransactionTemplate transactionTemplate;
+
+    public ReviewServiceImpl(ReviewRepository reviewRepository,
+                             PropertyClient propertyClient,
+                             UserClient userClient,
+                             BookingClient bookingClient,
+                             JwtTokenUtils jwtTokenUtils,
+                             RatingEventProducer ratingEventProducer,
+                             ModelMapper modelMapper,
+                             PlatformTransactionManager transactionManager) {
+        this.reviewRepository = reviewRepository;
+        this.propertyClient = propertyClient;
+        this.userClient = userClient;
+        this.bookingClient = bookingClient;
+        this.jwtTokenUtils = jwtTokenUtils;
+        this.ratingEventProducer = ratingEventProducer;
+        this.modelMapper = modelMapper;
+        this.transactionTemplate = new TransactionTemplate(transactionManager);
+    }
 
     @Override
     public Page<GetReviewDTO> getReviewsByPropertyId(Long propertyId, Pageable pageable) {
@@ -42,7 +62,7 @@ public class ReviewServiceImpl implements ReviewService {
     }
 
     @Override
-    @Transactional
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public GetReviewDTO saveReview(Review review, String token) {
         review.setId(null);
         Boolean propertyExists = propertyClient.propertyExists(review.getPropertyId());
@@ -63,18 +83,20 @@ public class ReviewServiceImpl implements ReviewService {
                     " until you've lived there.");
         }
 
-        enrichReview(review);
-        Review savedReview = reviewRepository.save(review);
+        return transactionTemplate.execute(status -> {
+            enrichReview(review);
+            Review savedReview = reviewRepository.save(review);
 
-        executeAfterCommit(() -> {
-            try {
-                ratingEventProducer.sendRatingUpdatedEvent(savedReview.getPropertyId());
-            } catch (Exception e) {
-                log.error("Failed to send rating update event for property " + savedReview.getPropertyId(), e);
-            }
+            executeAfterCommit(() -> {
+                try {
+                    ratingEventProducer.sendRatingUpdatedEvent(savedReview.getPropertyId());
+                } catch (Exception e) {
+                    log.error("Failed to send rating update event for property " + savedReview.getPropertyId(), e);
+                }
+            });
+
+            return convertToGetReviewDTO(savedReview);
         });
-
-        return convertToGetReviewDTO(savedReview);
     }
 
     @Override

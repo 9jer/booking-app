@@ -19,6 +19,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
@@ -52,6 +53,9 @@ class ReviewServiceImplTest {
 
     @Mock
     private ModelMapper modelMapper;
+
+    @Mock
+    private PlatformTransactionManager transactionManager;
 
     @InjectMocks
     @Spy

@@ -20,6 +20,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
@@ -50,6 +51,9 @@ class PropertyServiceImplTest {
 
     @Mock
     private ModelMapper modelMapper;
+
+    @Mock
+    private PlatformTransactionManager transactionManager;
 
     @InjectMocks
     private PropertyServiceImpl propertyService;
@@ -206,7 +210,6 @@ class PropertyServiceImplTest {
     void updateAverageRating_UpdatesRatingAndReturnsDTO() {
         // Given
         when(propertyRepository.findById(1L)).thenReturn(Optional.of(property));
-        when(propertyRepository.save(any(Property.class))).thenReturn(property);
         when(modelMapper.map(property, GetPropertyDTO.class)).thenReturn(getPropertyDTO);
 
         // When
@@ -214,7 +217,7 @@ class PropertyServiceImplTest {
 
         // Then
         assertNotNull(result);
-        verify(propertyRepository, times(1)).save(property);
+        verify(propertyRepository, times(1)).updateRating(eq(1L), eq(BigDecimal.valueOf(4.5)));
     }
 
     @Test
