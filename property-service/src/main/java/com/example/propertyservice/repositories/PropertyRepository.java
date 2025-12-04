@@ -16,7 +16,7 @@ import java.util.Optional;
 @Repository
 public interface PropertyRepository extends JpaRepository<Property, Long> {
 
-    @EntityGraph(attributePaths = {"features"})
+    @EntityGraph(attributePaths = {"features", "images"})
     Page<Property> findAll (Pageable pageable);
 
     @Override
