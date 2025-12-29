@@ -96,6 +96,7 @@ services:
       - JWT_SECRET=${JWT_SECRET}
     volumes:
       - ./property-service/src/main/resources/application-docker.yml:/application-docker.yml
+      - ./uploads:/uploads
     restart: on-failure
 
   postgres-property:
