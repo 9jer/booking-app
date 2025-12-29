@@ -1,4 +1,4 @@
-# Short-Term Housing Search and Booking Platform
+# Short-Term Housing Search and Booking Platform (Haven)
 
 This project is a platform for searching and booking short-term accommodations for tourists, similar to Airbnb. The application is built using microservices architecture, and it allows users to search for available properties, make bookings, manage property listings, and leave reviews. The system is developed with Java, Spring Framework, and various technologies for microservice-based architecture.
 
