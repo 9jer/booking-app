@@ -7,6 +7,7 @@ import lombok.Setter;
 
 import java.io.Serial;
 import java.io.Serializable;
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
@@ -33,6 +34,9 @@ public class GetBookingDTO implements Serializable {
 
     @NotNull(message = "status should not be empty!")
     private BookingStatus status;
+
+    private BigDecimal totalPrice;
+    private GetPropertyDTO property;
 
     private LocalDateTime createdAt;
 

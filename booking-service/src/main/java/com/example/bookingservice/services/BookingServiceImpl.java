@@ -2,9 +2,7 @@ package com.example.bookingservice.services;
 
 import com.example.bookingservice.client.PropertyClient;
 import com.example.bookingservice.client.UserClient;
-import com.example.bookingservice.dto.BookingHistoryDTO;
-import com.example.bookingservice.dto.GetBookingDTO;
-import com.example.bookingservice.dto.GetPropertyDTO;
+import com.example.bookingservice.dto.*;
 import com.example.bookingservice.event.BookingCreatedEvent;
 import com.example.bookingservice.event.BookingCreatedEventProducer;
 import com.example.bookingservice.models.Booking;
@@ -32,6 +30,7 @@ import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -133,6 +132,17 @@ public class BookingServiceImpl implements BookingService {
     }
 
     @Override
+    public List<GetBookingDTO> getUserRecentBookings(String jwtToken) {
+        Long userId = jwtTokenUtils.getUserId(jwtToken);
+
+        List<Booking> recentBookings = bookingRepository.findTop5ByUserIdOrderByCreatedAtDesc(userId);
+
+        return recentBookings.stream()
+                .map(booking -> modelMapper.map(booking, GetBookingDTO.class))
+                .collect(Collectors.toList());
+    }
+
+    @Override
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
     @Retryable(
             retryFor = { CannotSerializeTransactionException.class },
@@ -143,9 +153,7 @@ public class BookingServiceImpl implements BookingService {
     public GetBookingDTO createBooking(Booking booking, String token) {
         booking.setId(null);
 
-        if (booking.getStatus() == null) {
-            booking.setStatus(BookingStatus.PENDING);
-        }
+        booking.setStatus(BookingStatus.PENDING);
 
         validateBookingDates(booking.getCheckInDate(), booking.getCheckOutDate());
 
@@ -171,15 +179,6 @@ public class BookingServiceImpl implements BookingService {
             Booking savedBooking = bookingRepository.save(booking);
             saveHistory(savedBooking, booking.getStatus());
 
-            if (savedBooking.getStatus() == BookingStatus.CONFIRMED) {
-                executeAfterCommit(() -> {
-                    try {
-                        sendNotification(savedBooking, token);
-                    } catch (Exception e) {
-                        log.error("Failed to send notification for booking " + savedBooking.getId(), e);
-                    }
-                });
-            }
             return convertToGetBookingDTO(savedBooking);
         });
     }
@@ -228,6 +227,54 @@ public class BookingServiceImpl implements BookingService {
                 });
             }
             return convertToGetBookingDTO(updatedBooking);
+        });
+    }
+
+    @Override
+    @Transactional
+    public void initiatePayment(Long bookingId, String token) {
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new BookingException("Booking not found"));
+
+        Long currentUserId = jwtTokenUtils.getUserId(token);
+        if (!booking.getUserId().equals(currentUserId)) {
+            throw new BookingException("You can only pay for your own bookings");
+        }
+
+        if (booking.getStatus() != BookingStatus.PENDING) {
+            throw new BookingException("Booking cannot be paid (status is not PENDING)");
+        }
+
+        booking.setStatus(BookingStatus.AWAITING_PAYMENT);
+        booking.setUpdatedAt(LocalDateTime.now());
+
+        bookingRepository.save(booking);
+        saveHistory(booking, BookingStatus.AWAITING_PAYMENT);
+    }
+
+    @Override
+    @Transactional
+    public void completePayment(Long bookingId) {
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new BookingException("Booking not found"));
+
+        if (booking.getStatus() != BookingStatus.AWAITING_PAYMENT) {
+            return;
+        }
+
+        booking.setStatus(BookingStatus.CONFIRMED);
+        booking.setUpdatedAt(LocalDateTime.now());
+
+        saveHistory(booking, BookingStatus.CONFIRMED);
+
+        Booking savedBooking = bookingRepository.save(booking);
+
+        executeAfterCommit(() -> {
+            try {
+                sendNotificationWithoutToken(savedBooking);
+            } catch (Exception e) {
+                log.error("Failed to send notification for booking " + savedBooking.getId(), e);
+            }
         });
     }
 
@@ -290,6 +337,30 @@ public class BookingServiceImpl implements BookingService {
         return availableDates;
     }
 
+    @Override
+    @Transactional
+    public void cancelBooking(Long bookingId, String token) {
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new BookingException("Booking not found"));
+
+        Long currentUserId = jwtTokenUtils.getUserId(token);
+        List<String> roles = jwtTokenUtils.getRoles(token);
+
+        if (!roles.contains("ROLE_ADMIN") && !booking.getUserId().equals(currentUserId)) {
+            throw new BookingException("You are not authorized to cancel this booking.");
+        }
+
+        if (booking.getStatus() == BookingStatus.CANCELLED) {
+            throw new BookingException("Booking is already cancelled.");
+        }
+
+        booking.setStatus(BookingStatus.CANCELLED);
+        booking.setUpdatedAt(LocalDateTime.now());
+
+        saveHistory(booking, BookingStatus.CANCELLED);
+        bookingRepository.save(booking);
+    }
+
     private void saveHistory(Booking booking, BookingStatus bookingStatus) {
         BookingHistory bookingHistory = new BookingHistory();
         bookingHistory.setBooking(booking);
@@ -328,6 +399,31 @@ public class BookingServiceImpl implements BookingService {
         producer.sendBookingCreatedEvent("booking-created", bookingCreatedEvent);
     }
 
+    private void sendNotificationWithoutToken(Booking booking) {
+        BookingCreatedEvent bookingCreatedEvent = new BookingCreatedEvent();
+        bookingCreatedEvent.setBookingId(booking.getId());
+
+        try {
+             UserDTO user = userClient.getUserById(booking.getUserId());
+             bookingCreatedEvent.setEmail(user.getEmail());
+        } catch (Exception e) {
+            log.error("Could not fetch user email", e);
+            return;
+        }
+
+        try {
+            String propertyTitle = propertyClient.getPropertyById(booking.getPropertyId()).getTitle();
+            bookingCreatedEvent.setPropertyName(propertyTitle);
+        } catch (Exception e) {
+            bookingCreatedEvent.setPropertyName("Unknown Property");
+        }
+
+        bookingCreatedEvent.setCheckInDate(booking.getCheckInDate().toString());
+        bookingCreatedEvent.setCheckOutDate(booking.getCheckOutDate().toString());
+
+        producer.sendBookingCreatedEvent("booking-created", bookingCreatedEvent);
+    }
+
     protected void executeAfterCommit(Runnable runnable) {
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override
@@ -338,7 +434,28 @@ public class BookingServiceImpl implements BookingService {
     }
 
     private GetBookingDTO convertToGetBookingDTO(Booking booking) {
-        return modelMapper.map(booking, GetBookingDTO.class);
+        GetBookingDTO dto = modelMapper.map(booking, GetBookingDTO.class);
+
+        try {
+            GetPropertyDTO propertyDTO = propertyClient.getPropertyById(booking.getPropertyId());
+            dto.setProperty(propertyDTO);
+
+            if (propertyDTO != null && propertyDTO.getPricePerNight() != null) {
+                long days = java.time.temporal.ChronoUnit.DAYS.between(
+                        booking.getCheckInDate(),
+                        booking.getCheckOutDate()
+                );
+                if (days < 1) days = 1;
+
+                BigDecimal total = propertyDTO.getPricePerNight()
+                        .multiply(BigDecimal.valueOf(days));
+                dto.setTotalPrice(total);
+            }
+        } catch (Exception e) {
+            log.error("Failed to fetch property details for booking " + booking.getId(), e);
+        }
+
+        return dto;
     }
 
     private BookingHistoryDTO convertToBookingHistoryDTO(BookingHistory bookingHistory) {

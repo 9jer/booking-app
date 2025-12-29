@@ -63,6 +63,7 @@ server:
   port: 8082
 
 application:
+  frontend-url: ${FRONTEND_URL:http://localhost:5173}
   endpoint:
     root: /api/v1/bookings
     id: /{id}

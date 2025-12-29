@@ -24,6 +24,8 @@ import org.springframework.web.bind.annotation.*;
 
 import java.net.URI;
 import java.time.LocalDate;
+import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("${application.endpoint.root}")
@@ -31,8 +33,12 @@ import java.time.LocalDate;
 public class BookingController {
     private final BookingService bookingService;
     private final ModelMapper modelMapper;
+
     @Value("${application.endpoint.root}")
     private String rootEndpointUri;
+
+    @Value("${application.frontend-url}")
+    private String frontendUrl;
 
     @GetMapping
     public ResponseEntity<Page<GetBookingDTO>> getAllBookings(@Parameter(hidden = true) @RequestHeader("Authorization") String authorizationHeader,
@@ -69,6 +75,16 @@ public class BookingController {
         return ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(new BookingHistoryResponse(bookingService.getBookingHistoryByBookingId(id)));
+    }
+
+    @GetMapping("/recent")
+    public ResponseEntity<List<GetBookingDTO>> getRecentBookings(
+            @Parameter(hidden = true) @RequestHeader("Authorization") String authorizationHeader) {
+
+        String jwtToken = authorizationHeader.replace("Bearer ", "");
+        return ResponseEntity.ok()
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(bookingService.getUserRecentBookings(jwtToken));
     }
 
     @PostMapping
@@ -110,6 +126,24 @@ public class BookingController {
         return ResponseEntity.ok(bookingService.isAvailable(propertyId, checkIn, checkOut));
     }
 
+    @PostMapping("/{bookingId}/payment")
+    public ResponseEntity<Map<String, String>> initPayment(
+            @PathVariable Long bookingId,
+            @Parameter(hidden = true) @RequestHeader("Authorization") String authorizationHeader) {
+
+        String jwtToken = authorizationHeader.replace("Bearer ", "");
+
+        bookingService.initiatePayment(bookingId, jwtToken);
+
+        return ResponseEntity.ok(Map.of("paymentUrl", frontendUrl + bookingId));
+    }
+
+    @PostMapping("/{bookingId}/payment/success")
+    public ResponseEntity<Void> handlePaymentSuccess(@PathVariable Long bookingId) {
+        bookingService.completePayment(bookingId);
+        return ResponseEntity.ok().build();
+    }
+
     @GetMapping(path = "${application.endpoint.was-booked}")
     public ResponseEntity<Boolean> wasBooked(@RequestParam("propertyId") Long propertyId, @RequestParam("userId") Long userId){
         Boolean result = bookingService.whetherThereWasABooking(propertyId, userId);
@@ -121,6 +155,16 @@ public class BookingController {
         return ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(new AvailableDatesResponse(bookingService.getAvailableDates(propertyId)));
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> cancelBooking(@PathVariable Long id,
+                                              @Parameter(hidden = true) @RequestHeader("Authorization") String authorizationHeader) {
+        String jwtToken = authorizationHeader.replace("Bearer ", "");
+
+        bookingService.cancelBooking(id, jwtToken);
+
+        return ResponseEntity.noContent().build();
     }
 
     private Booking convertBookingDTOToBooking(BookingDTO bookingDTO){

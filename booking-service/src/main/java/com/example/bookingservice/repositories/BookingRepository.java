@@ -34,4 +34,6 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
     @Query("SELECT b FROM Booking b WHERE b.propertyId = :propertyId AND b.userId = :userId " +
             "AND b.status = 'CONFIRMED' AND b.checkOutDate < CURRENT_DATE")
     List<Booking> findConfirmedBookingByPropertyIdAndUserId(Long propertyId, Long userId);
+
+    List<Booking> findTop5ByUserIdOrderByCreatedAtDesc(Long userId);
 }
