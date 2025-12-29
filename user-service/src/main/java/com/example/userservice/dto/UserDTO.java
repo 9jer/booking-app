@@ -27,8 +27,11 @@ public class UserDTO implements Serializable {
     @NotEmpty(message = "Email should not be empty!")
     private String email;
 
-    @NotEmpty(message = "Name should not be empty!")
-    private String name;
+    @NotEmpty(message = "First name should not be empty!")
+    private String firstName;
+
+    @NotEmpty(message = "Last name should not be empty!")
+    private String lastName;
 
     @NotEmpty(message = "Phone should not be empty!")
     private String phone;

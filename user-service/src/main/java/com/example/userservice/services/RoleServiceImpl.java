@@ -26,4 +26,11 @@ public class RoleServiceImpl implements RoleService {
         return roleRepository.findByName("ROLE_OWNER")
                 .orElseThrow(() -> new RuntimeException("Role OWNER not found"));
     }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Role findByName(String name) {
+        return roleRepository.findByName(name)
+                .orElseThrow(() -> new RuntimeException("Role not found: " + name));
+    }
 }

@@ -1,10 +1,12 @@
 package com.example.userservice.controllers;
 
-import com.example.userservice.dto.SaveUserDTO;
+import com.example.userservice.dto.UpdateUserDTO;
 import com.example.userservice.dto.UserDTO;
+import com.example.userservice.security.CustomUserDetailsService;
 import com.example.userservice.services.UserService;
 import com.example.userservice.util.ErrorResponse;
 import com.example.userservice.util.ErrorsUtil;
+import com.example.userservice.util.JwtTokenUtils;
 import com.example.userservice.util.UserException;
 import io.swagger.v3.oas.annotations.Parameter;
 import jakarta.validation.Valid;
@@ -12,9 +14,11 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.annotation.*;
 
@@ -25,6 +29,8 @@ import java.security.Principal;
 @RequiredArgsConstructor
 public class UserController {
     private final UserService userService;
+    private final JwtTokenUtils jwtTokenUtils;
+    private final CustomUserDetailsService userDetailsService;
 
     @GetMapping
     public ResponseEntity<Page<UserDTO>> getAllUsers(
@@ -34,19 +40,25 @@ public class UserController {
                 .body(userService.findAll(pageable));
     }
 
-    @PatchMapping(path = "${application.endpoint.users.id}")
-    public ResponseEntity<UserDTO> updateUser(@Parameter(hidden = true) @RequestHeader("Authorization") String authorizationHeader,
-                                              @PathVariable("id") Long id, @RequestBody @Valid SaveUserDTO saveUserDTO, BindingResult bindingResult) {
+    @PatchMapping
+    public ResponseEntity<UserDTO> updateUserInfo(@Parameter(hidden = true) @RequestHeader("Authorization") String authorizationHeader,
+                                              @RequestBody @Valid UpdateUserDTO updateUserDTO, BindingResult bindingResult) {
 
         if(bindingResult.hasErrors()) {
             ErrorsUtil.returnAllErrors(bindingResult);
         }
 
-        String jwtToken = authorizationHeader.replace("Bearer ", "");
+        String cleanToken = authorizationHeader.startsWith("Bearer ") ? authorizationHeader.substring(7) : authorizationHeader;
+
+        UserDTO updatedUser = userService.updateUser(updateUserDTO, cleanToken);
+
+        UserDetails userDetails = userDetailsService.loadUserByUsername(updatedUser.getUsername());
+        String newToken = jwtTokenUtils.generateToken(userDetails);
 
         return ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_JSON)
-                .body(userService.updateUserById(id, saveUserDTO, jwtToken));
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + newToken)
+                .body(updatedUser);
     }
 
     @DeleteMapping(path = "${application.endpoint.users.id}")
@@ -65,6 +77,11 @@ public class UserController {
                 .body(userService.getUserById(id));
     }
 
+    @GetMapping("/profile")
+    public ResponseEntity<UserDTO> getUserProfile(Principal principal) {
+        return ResponseEntity.ok(userService.getUserByUsername(principal.getName()));
+    }
+
     @PostMapping(path = "${application.endpoint.users.assign-owner}")
     public ResponseEntity<UserDTO> assignOwnerRole(@PathVariable("id") Long id) {
         return ResponseEntity.ok()
@@ -75,11 +92,6 @@ public class UserController {
     @GetMapping(path = "${application.endpoint.users.exists}")
     public ResponseEntity<Boolean> userExists(@PathVariable("id") Long id) {
         return ResponseEntity.ok(userService.existsById(id));
-    }
-
-    @GetMapping(path = "${application.endpoint.users.info}")
-    public String userData(Principal principal){
-        return principal.getName();
     }
 
     @ExceptionHandler

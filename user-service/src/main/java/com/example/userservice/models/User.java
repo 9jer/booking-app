@@ -32,9 +32,13 @@ public class User {
     @NotEmpty(message = "Password should not be empty!")
     private String password;
 
-    @Column(name = "name")
-    @NotEmpty(message = "Name should not be empty!")
-    private String name;
+    @Column(name = "first_name")
+    @NotEmpty(message = "First name should not be empty!")
+    private String firstName;
+
+    @Column(name = "last_name")
+    @NotEmpty(message = "Last name should not be empty!")
+    private String lastName;
 
     @Column(name = "phone")
     @NotEmpty(message = "Phone should not be empty!")
@@ -53,5 +57,4 @@ public class User {
 
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
-
 }

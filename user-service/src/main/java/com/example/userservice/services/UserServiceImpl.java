@@ -1,6 +1,6 @@
 package com.example.userservice.services;
 
-import com.example.userservice.dto.SaveUserDTO;
+import com.example.userservice.dto.UpdateUserDTO;
 import com.example.userservice.dto.UserDTO;
 import com.example.userservice.models.Role;
 import com.example.userservice.models.User;
@@ -12,6 +12,7 @@ import org.modelmapper.ModelMapper;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.CachePut;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.Caching;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -49,7 +50,6 @@ public class UserServiceImpl implements UserService {
     @CachePut(value = "userById", key = "#result.id")
     public UserDTO createNewUser(User user) {
         user.setPassword(passwordEncoder.encode(user.getPassword()));
-        user.setRoles(List.of(roleService.getGuestRole()));
         user.setCreatedAt(LocalDateTime.now());
         User savedUser = userRepository.save(user);
         return convertToUserDTO(savedUser);
@@ -70,33 +70,36 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
+    @Cacheable(value = "userByUsername", key = "#username")
+    public UserDTO getUserByUsername(String username) {
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new UserException("User not found with username: " + username));
+        return convertToUserDTO(user);
+    }
+
+    @Override
     @Transactional
-    @CachePut(value = "userById", key = "#id")
-    public UserDTO updateUserById(Long id, SaveUserDTO updatedUser, String token) {
+    @Caching(put = {
+            @CachePut(value = "userById", key = "#result.id"),
+            @CachePut(value = "userByUsername", key = "#result.username")
+    })
+    public UserDTO updateUser(UpdateUserDTO updatedUser, String token) {
         Long currentUserId = jwtTokenUtils.getUserId(token);
         List<String> roles = jwtTokenUtils.getRoles(token);
 
-        if (!roles.contains("ROLE_ADMIN") && !currentUserId.equals(id)) {
-            throw new UserException("You can only update your own account.");
-        }
-
-        if (!updatedUser.getPassword().equals(updatedUser.getConfirmPassword())) {
-            throw new UserException("Incorrect password!");
-        }
-
-        User existingUser = userRepository.findById(id).orElseThrow(() ->
-                new UserException(String.format("User %s not found", id)));
+        User existingUser = userRepository.findById(currentUserId).orElseThrow(() ->
+                new UserException(String.format("User %s not found", currentUserId)));
 
         Optional<User> userByUsername = userRepository.findByUsername(updatedUser.getUsername());
-        if(userByUsername.isPresent() && !userByUsername.get().getId().equals(id)) {
+        if(userByUsername.isPresent() && !userByUsername.get().getId().equals(currentUserId)) {
             throw new UserException("Username already taken");
         }
         Optional<User> userByEmail = userRepository.findByEmail(updatedUser.getEmail());
-        if(userByEmail.isPresent() && !userByEmail.get().getId().equals(id)) {
+        if(userByEmail.isPresent() && !userByEmail.get().getId().equals(currentUserId)) {
             throw new UserException("Email already taken");
         }
 
-        enrichPropertyForUpdate(existingUser, convertSaveUserDTOToUser(updatedUser));
+        enrichPropertyForUpdate(existingUser, convertUpdateUserDTOToUser(updatedUser));
 
         User savedUser = userRepository.save(existingUser);
         return convertToUserDTO(savedUser);
@@ -154,14 +157,14 @@ public class UserServiceImpl implements UserService {
         return dto;
     }
 
-    private User convertSaveUserDTOToUser(SaveUserDTO saveUserDTO){
-        return modelMapper.map(saveUserDTO, User.class);
+    private User convertUpdateUserDTOToUser(UpdateUserDTO updateUserDTO){
+        return modelMapper.map(updateUserDTO, User.class);
     }
 
     private void enrichPropertyForUpdate(User existingUser, User updatedUser) {
         existingUser.setUsername(updatedUser.getUsername());
-        existingUser.setPassword(passwordEncoder.encode(updatedUser.getPassword()));
-        existingUser.setName(updatedUser.getName());
+        existingUser.setFirstName(updatedUser.getFirstName());
+        existingUser.setLastName(updatedUser.getLastName());
         existingUser.setEmail(updatedUser.getEmail());
         existingUser.setPhone(updatedUser.getPhone());
         existingUser.setUpdatedAt(LocalDateTime.now());
