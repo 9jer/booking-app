@@ -4,6 +4,7 @@ import com.example.reviewservice.client.BookingClient;
 import com.example.reviewservice.client.PropertyClient;
 import com.example.reviewservice.client.UserClient;
 import com.example.reviewservice.dto.GetReviewDTO;
+import com.example.reviewservice.dto.UserResponseDTO;
 import com.example.reviewservice.event.RatingEventProducer;
 import com.example.reviewservice.models.Review;
 import com.example.reviewservice.repositories.ReviewRepository;
@@ -181,6 +182,13 @@ public class ReviewServiceImpl implements ReviewService {
     }
 
     private GetReviewDTO convertToGetReviewDTO(Review review) {
-        return modelMapper.map(review, GetReviewDTO.class);
+        GetReviewDTO dto = modelMapper.map(review, GetReviewDTO.class);
+        try {
+            UserResponseDTO user = userClient.getUserById(review.getUserId());
+            dto.setUsername(user.getUsername());
+        } catch (Exception e) {
+            dto.setUsername("Unknown User");
+        }
+        return dto;
     }
 }

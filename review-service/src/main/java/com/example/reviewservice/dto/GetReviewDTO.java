@@ -26,6 +26,9 @@ public class GetReviewDTO implements Serializable {
     @NotNull(message = "User id should not be empty!")
     private Long userId;
 
+    @NotNull(message = "Username should not be empty!")
+    private String username;
+
     @NotNull(message = "Rating should not be empty!")
     @Min(value = 1, message = "Rating should be greater than 1 and less than 5")
     @Max(value = 5, message = "Rating should be greater than 1 and less than 5")
