@@ -1,10 +1,10 @@
 package com.example.propertyservice.services;
 
-import com.example.propertyservice.client.BookingClient;
 import com.example.propertyservice.client.UserClient;
 import com.example.propertyservice.dto.GetPropertyDTO;
 import com.example.propertyservice.models.Property;
 import com.example.propertyservice.models.PropertyFeature;
+import com.example.propertyservice.repositories.FavoriteRepository;
 import com.example.propertyservice.repositories.PropertyFeatureRepository;
 import com.example.propertyservice.repositories.PropertyRepository;
 import com.example.propertyservice.util.JwtTokenUtils;
@@ -22,6 +22,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.SimpleTransactionStatus;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -41,7 +42,7 @@ class PropertyServiceImplTest {
     private PropertyFeatureRepository propertyFeatureRepository;
 
     @Mock
-    private BookingClient bookingClient;
+    private FavoriteRepository favoriteRepository;
 
     @Mock
     private UserClient userClient;
@@ -82,6 +83,8 @@ class PropertyServiceImplTest {
         getPropertyDTO = new GetPropertyDTO();
         getPropertyDTO.setId(1L);
         getPropertyDTO.setTitle("Test Property");
+
+        lenient().when(transactionManager.getTransaction(any())).thenReturn(new SimpleTransactionStatus());
     }
 
     @Test
@@ -186,23 +189,36 @@ class PropertyServiceImplTest {
     @Test
     void search_ReturnsFilteredDTOs() {
         // Given
-        String location = "Test";
+        String location = "test";
+        String expectedLocationPattern = "%test%";
         BigDecimal minPrice = BigDecimal.valueOf(50);
         BigDecimal maxPrice = BigDecimal.valueOf(150);
         Pageable pageable = PageRequest.of(0, 10);
 
-        when(propertyRepository.searchProperties(eq(location), eq(minPrice), eq(maxPrice), eq(pageable)))
-                .thenReturn(new PageImpl<>(List.of(property)));
-        when(modelMapper.map(property, GetPropertyDTO.class)).thenReturn(getPropertyDTO);
+        Page<Property> propertyPage = new PageImpl<>(List.of(property));
+
+        when(propertyRepository.searchProperties(
+                eq(expectedLocationPattern),
+                eq(minPrice),
+                eq(maxPrice),
+                eq(pageable)
+        )).thenReturn(propertyPage);
+
+        when(modelMapper.map(any(Property.class), eq(GetPropertyDTO.class))).thenReturn(getPropertyDTO);
 
         // When
         Page<GetPropertyDTO> result = propertyService.search(location, minPrice, maxPrice, pageable);
 
         // Then
+        assertNotNull(result);
         assertEquals(1, result.getTotalElements());
-        assertEquals(getPropertyDTO.getId(), result.getContent().get(0).getId());
-        verify(propertyRepository, times(1))
-                .searchProperties(location, minPrice, maxPrice, pageable);
+
+        verify(propertyRepository, times(1)).searchProperties(
+                eq(expectedLocationPattern),
+                eq(minPrice),
+                eq(maxPrice),
+                eq(pageable)
+        );
     }
 
     @Test
@@ -249,4 +265,49 @@ class PropertyServiceImplTest {
         verify(propertyRepository, times(1)).delete(property);
     }
 
+    @Test
+    @Transactional
+    void toggleFavorite_WhenNotExists_CreatesFavorite() {
+        // Given
+        when(jwtTokenUtils.getUserId(anyString())).thenReturn(1L);
+        when(propertyRepository.findById(1L)).thenReturn(Optional.of(property));
+        when(favoriteRepository.findByUserIdAndPropertyId(1L, 1L)).thenReturn(Optional.empty());
+
+        // When
+        propertyService.toggleFavorite(1L, "token");
+
+        // Then
+        verify(favoriteRepository).save(any());
+    }
+
+    @Test
+    @Transactional
+    void toggleFavorite_WhenExists_DeletesFavorite() {
+        // Given
+        com.example.propertyservice.models.Favorite favorite = new com.example.propertyservice.models.Favorite();
+        when(jwtTokenUtils.getUserId(anyString())).thenReturn(1L);
+        when(propertyRepository.findById(1L)).thenReturn(Optional.of(property));
+        when(favoriteRepository.findByUserIdAndPropertyId(1L, 1L)).thenReturn(Optional.of(favorite));
+
+        // When
+        propertyService.toggleFavorite(1L, "token");
+
+        // Then
+        verify(favoriteRepository).delete(favorite);
+    }
+
+    @Test
+    void getMyProperties_ReturnsPageOfDTOs() {
+        // Given
+        Pageable pageable = PageRequest.of(0, 10);
+        when(jwtTokenUtils.getUserId("token")).thenReturn(1L);
+        when(propertyRepository.findByOwnerId(1L, pageable)).thenReturn(new PageImpl<>(List.of(property)));
+        when(modelMapper.map(property, GetPropertyDTO.class)).thenReturn(getPropertyDTO);
+
+        // When
+        Page<GetPropertyDTO> result = propertyService.getMyProperties("token", pageable);
+
+        // Then
+        assertEquals(1, result.getTotalElements());
+    }
 }

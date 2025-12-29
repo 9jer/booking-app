@@ -66,7 +66,8 @@ class AuthControllerIT {
         testSaveUserDTO.setEmail("test@example.com");
         testSaveUserDTO.setPassword("password");
         testSaveUserDTO.setConfirmPassword("password");
-        testSaveUserDTO.setName("Test User");
+        testSaveUserDTO.setFirstName("Test");
+        testSaveUserDTO.setLastName("User");
         testSaveUserDTO.setPhone("1234567890");
 
         testJwtResponse = new JwtResponse("test.token.here");

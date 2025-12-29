@@ -5,6 +5,7 @@ import com.example.bookingservice.client.UserClient;
 import com.example.bookingservice.dto.BookingHistoryDTO;
 import com.example.bookingservice.dto.GetBookingDTO;
 import com.example.bookingservice.dto.GetPropertyDTO;
+import com.example.bookingservice.dto.UserDTO;
 import com.example.bookingservice.event.BookingCreatedEvent;
 import com.example.bookingservice.event.BookingCreatedEventProducer;
 import com.example.bookingservice.models.Booking;
@@ -28,6 +29,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.SimpleTransactionStatus;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -98,6 +100,8 @@ class BookingServiceImplTest {
         getBookingDTO.setId(1L);
 
         bookingHistoryDTO = new BookingHistoryDTO();
+
+        lenient().when(transactionManager.getTransaction(any())).thenReturn(new SimpleTransactionStatus());
     }
 
     @Test
@@ -191,23 +195,17 @@ class BookingServiceImplTest {
         GetPropertyDTO propertyDTO = new GetPropertyDTO();
         propertyDTO.setTitle("Test Property");
 
-        doAnswer(invocation -> {
-            ((Runnable) invocation.getArgument(0)).run();
-            return null;
-        }).when(bookingService).executeAfterCommit(any());
-
         when(propertyClient.propertyExists(1L)).thenReturn(true);
         when(jwtTokenUtils.getUserId(token)).thenReturn(1L);
         when(userClient.userExists(1L)).thenReturn(true);
         when(bookingRepository.countOverlappingBookings(1L, booking.getCheckInDate(), booking.getCheckOutDate()))
                 .thenReturn(0L);
+
         when(bookingRepository.save(any(Booking.class))).thenAnswer(invocation -> {
             Booking savedBooking = invocation.getArgument(0);
             savedBooking.setId(1L);
             return savedBooking;
         });
-        when(jwtTokenUtils.getEmail(token)).thenReturn("test@example.com");
-        when(propertyClient.getPropertyById(1L)).thenReturn(propertyDTO);
 
         when(modelMapper.map(any(Booking.class), eq(GetBookingDTO.class))).thenReturn(getBookingDTO);
 
@@ -219,7 +217,8 @@ class BookingServiceImplTest {
         assertEquals(1L, result.getId());
         verify(bookingRepository, times(1)).save(booking);
         verify(bookingHistoryRepository, times(1)).save(any(BookingHistory.class));
-        verify(producer, times(1)).sendBookingCreatedEvent(anyString(), any(BookingCreatedEvent.class));
+
+        verify(producer, never()).sendBookingCreatedEvent(anyString(), any(BookingCreatedEvent.class));
     }
 
     @Test
@@ -385,5 +384,116 @@ class BookingServiceImplTest {
         assertTrue(result.contains(LocalDate.now().plusDays(8)));
         assertTrue(result.contains(LocalDate.now().plusDays(13)));
         assertFalse(result.contains(LocalDate.now().plusDays(6)));
+    }
+
+    @Test
+    void initiatePayment_ValidBooking_NoException() {
+        // Given
+        booking.setStatus(BookingStatus.PENDING);
+
+        when(bookingRepository.findById(1L)).thenReturn(Optional.of(booking));
+        when(jwtTokenUtils.getUserId(token)).thenReturn(1L);
+
+        // When & Then
+        assertDoesNotThrow(() -> bookingService.initiatePayment(1L, token));
+
+        assertEquals(BookingStatus.AWAITING_PAYMENT, booking.getStatus());
+    }
+
+    @Test
+    void completePayment_ValidBooking_UpdatesStatusToPaid() {
+        // Given
+        booking.setStatus(BookingStatus.AWAITING_PAYMENT);
+
+        GetPropertyDTO propertyDTO = new GetPropertyDTO();
+        propertyDTO.setTitle("Luxury Villa");
+
+        UserDTO userDTO = new UserDTO();
+        userDTO.setId(1L);
+        userDTO.setEmail("test@example.com");
+        userDTO.setUsername("testuser");
+
+        doAnswer(invocation -> {
+            ((Runnable) invocation.getArgument(0)).run();
+            return null;
+        }).when(bookingService).executeAfterCommit(any());
+
+        when(bookingRepository.findById(1L)).thenReturn(Optional.of(booking));
+        when(bookingHistoryRepository.save(any(BookingHistory.class))).thenReturn(new BookingHistory());
+        when(bookingRepository.save(any(Booking.class))).thenReturn(booking);
+
+        when(propertyClient.getPropertyById(1L)).thenReturn(propertyDTO);
+        when(userClient.getUserById(1L)).thenReturn(userDTO);
+
+        // When
+        bookingService.completePayment(1L);
+
+        // Then
+        assertEquals(BookingStatus.CONFIRMED, booking.getStatus());
+        verify(bookingRepository, times(1)).save(booking);
+
+        verify(producer, times(1)).sendBookingCreatedEvent(anyString(), any(BookingCreatedEvent.class));
+    }
+
+    @Test
+    @Transactional
+    void cancelBooking_OwnerOrAdmin_CancelsBooking() {
+        // Given
+        booking.setStatus(BookingStatus.CONFIRMED);
+        when(bookingRepository.findById(1L)).thenReturn(Optional.of(booking));
+        when(jwtTokenUtils.getRoles(token)).thenReturn(List.of("ROLE_ADMIN"));
+
+        when(bookingRepository.save(booking)).thenReturn(booking);
+
+        // When
+        bookingService.cancelBooking(1L, token);
+
+        // Then
+        assertEquals(BookingStatus.CANCELLED, booking.getStatus());
+        verify(bookingHistoryRepository).save(any(BookingHistory.class));
+    }
+
+    @Test
+    void cancelBooking_NotAuthorized_ThrowsException() {
+        // Given
+        booking.setUserId(999L);
+        when(bookingRepository.findById(1L)).thenReturn(Optional.of(booking));
+        when(jwtTokenUtils.getUserId(token)).thenReturn(1L);
+        when(jwtTokenUtils.getRoles(token)).thenReturn(List.of("ROLE_USER"));
+
+        // When & Then
+        BookingException exception = assertThrows(BookingException.class,
+                () -> bookingService.cancelBooking(1L, token));
+        assertEquals("You are not authorized to cancel this booking.", exception.getMessage());
+    }
+
+    @Test
+    void cancelBooking_AlreadyCancelled_ThrowsException() {
+        // Given
+        booking.setStatus(BookingStatus.CANCELLED);
+        when(bookingRepository.findById(1L)).thenReturn(Optional.of(booking));
+        when(jwtTokenUtils.getUserId(token)).thenReturn(1L);
+        when(jwtTokenUtils.getRoles(token)).thenReturn(List.of("ROLE_ADMIN"));
+
+        // When & Then
+        BookingException exception = assertThrows(BookingException.class,
+                () -> bookingService.cancelBooking(1L, token));
+        assertEquals("Booking is already cancelled.", exception.getMessage());
+    }
+
+    @Test
+    void getUserRecentBookings_ReturnsList() {
+        // Given
+        when(jwtTokenUtils.getUserId(token)).thenReturn(1L);
+        when(bookingRepository.findTop5ByUserIdOrderByCreatedAtDesc(1L))
+                .thenReturn(List.of(booking));
+        when(modelMapper.map(booking, GetBookingDTO.class)).thenReturn(getBookingDTO);
+
+        // When
+        List<GetBookingDTO> result = bookingService.getUserRecentBookings(token);
+
+        // Then
+        assertFalse(result.isEmpty());
+        assertEquals(1, result.size());
     }
 }

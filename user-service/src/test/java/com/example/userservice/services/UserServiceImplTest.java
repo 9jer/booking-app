@@ -1,6 +1,6 @@
 package com.example.userservice.services;
 
-import com.example.userservice.dto.SaveUserDTO;
+import com.example.userservice.dto.UpdateUserDTO;
 import com.example.userservice.dto.UserDTO;
 import com.example.userservice.models.Role;
 import com.example.userservice.models.User;
@@ -46,7 +46,7 @@ class UserServiceImplTest {
 
     private User user;
     private UserDTO userDTO;
-    private SaveUserDTO saveUserDTO;
+    private UpdateUserDTO updateUserDTO;
     private Role guestRole;
     private Role ownerRole;
     private String token = "valid-token";
@@ -65,13 +65,12 @@ class UserServiceImplTest {
         userDTO.setUsername("testuser");
         userDTO.setEmail("test@example.com");
 
-        saveUserDTO = new SaveUserDTO();
-        saveUserDTO.setUsername("testuser");
-        saveUserDTO.setEmail("test@example.com");
-        saveUserDTO.setPassword("password");
-        saveUserDTO.setConfirmPassword("password");
-        saveUserDTO.setName("Test User");
-        saveUserDTO.setPhone("1234567890");
+        updateUserDTO = new UpdateUserDTO();
+        updateUserDTO.setUsername("testuser");
+        updateUserDTO.setEmail("test@example.com");
+        updateUserDTO.setFirstName("Test");
+        updateUserDTO.setLastName("User");
+        updateUserDTO.setPhone("1234567890");
 
         guestRole = new Role();
         guestRole.setId(1);
@@ -91,7 +90,6 @@ class UserServiceImplTest {
         inputUser.setPassword("password");
 
         when(passwordEncoder.encode("password")).thenReturn("encodedPassword");
-        when(roleService.getGuestRole()).thenReturn(guestRole);
 
         when(userRepository.save(any(User.class))).thenAnswer(invocation -> {
             User saved = invocation.getArgument(0);
@@ -110,7 +108,7 @@ class UserServiceImplTest {
     }
 
     @Test
-    void updateUserById_Owner_UpdatesUser() {
+    void updateUser_Owner_UpdatesUser() {
         User updatedUserFromDTO = new User();
         updatedUserFromDTO.setUsername("newuser");
         updatedUserFromDTO.setPassword("newpassword");
@@ -121,16 +119,36 @@ class UserServiceImplTest {
         when(userRepository.findByUsername(anyString())).thenReturn(Optional.empty());
         when(userRepository.findByEmail(anyString())).thenReturn(Optional.empty());
 
-        when(modelMapper.map(saveUserDTO, User.class)).thenReturn(updatedUserFromDTO);
-        when(passwordEncoder.encode(anyString())).thenReturn("encodedNewPass");
+        when(modelMapper.map(updateUserDTO, User.class)).thenReturn(updatedUserFromDTO);
 
         when(userRepository.save(user)).thenReturn(user);
         when(modelMapper.map(user, UserDTO.class)).thenReturn(userDTO);
 
-        UserDTO result = userService.updateUserById(1L, saveUserDTO, token);
+        UserDTO result = userService.updateUser(updateUserDTO, token);
 
         assertNotNull(result);
         verify(userRepository).save(user);
+    }
+
+    @Test
+    void updateUser_EmailAlreadyTaken_ThrowsException() {
+        // Given
+        User anotherUser = new User();
+        anotherUser.setId(2L);
+        anotherUser.setEmail("taken@example.com");
+
+        updateUserDTO.setEmail("taken@example.com");
+
+        when(jwtTokenUtils.getUserId(token)).thenReturn(1L);
+        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+
+        when(userRepository.findByUsername(anyString())).thenReturn(Optional.empty());
+        when(userRepository.findByEmail("taken@example.com")).thenReturn(Optional.of(anotherUser));
+
+        // When & Then
+        UserException exception = assertThrows(UserException.class,
+                () -> userService.updateUser(updateUserDTO, token));
+        assertEquals("Email already taken", exception.getMessage());
     }
 
     @Test

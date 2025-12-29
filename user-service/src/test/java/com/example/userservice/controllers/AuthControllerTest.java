@@ -12,8 +12,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.modelmapper.ModelMapper;
-import org.slf4j.Logger;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -31,12 +29,6 @@ class AuthControllerTest {
 
     @Mock
     private BindingResult bindingResult;
-
-    @Mock
-    private Logger logger;
-
-    @Mock
-    private ModelMapper modelMapper;
 
     @InjectMocks
     private AuthController authController;
@@ -57,7 +49,8 @@ class AuthControllerTest {
         saveUserDTO.setEmail("test@example.com");
         saveUserDTO.setPassword("password");
         saveUserDTO.setConfirmPassword("password");
-        saveUserDTO.setName("Test User");
+        saveUserDTO.setFirstName("Test");
+        saveUserDTO.setLastName("User");
         saveUserDTO.setPhone("1234567890");
 
         jwtResponse = new JwtResponse("testtoken");

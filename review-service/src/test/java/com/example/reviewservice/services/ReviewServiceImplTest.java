@@ -21,6 +21,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.SimpleTransactionStatus;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -78,6 +79,8 @@ class ReviewServiceImplTest {
         getReviewDTO = new GetReviewDTO();
         getReviewDTO.setId(1L);
         getReviewDTO.setRating(5);
+
+        lenient().when(transactionManager.getTransaction(any())).thenReturn(new SimpleTransactionStatus());
     }
 
     @Test
@@ -127,6 +130,27 @@ class ReviewServiceImplTest {
 
         verify(reviewRepository, times(1)).save(any(Review.class));
         verify(ratingEventProducer, times(1)).sendRatingUpdatedEvent(1L);
+    }
+
+    @Test
+    void saveReview_UserDidNotBook_ThrowsException() {
+        // Given
+        Review newReview = new Review();
+        newReview.setPropertyId(1L);
+        newReview.setUserId(1L);
+
+        when(propertyClient.propertyExists(1L)).thenReturn(true);
+        when(jwtTokenUtils.getUserId(validToken)).thenReturn(1L);
+        when(userClient.userExists(1L)).thenReturn(true);
+
+        when(bookingClient.wasBooked(1L, 1L)).thenReturn(false);
+
+        // When & Then
+        ReviewException exception = assertThrows(ReviewException.class,
+                () -> reviewService.saveReview(newReview, validToken));
+
+        assertTrue(exception.getMessage().contains("until you've lived there"));
+        verify(reviewRepository, never()).save(any());
     }
 
     @Test

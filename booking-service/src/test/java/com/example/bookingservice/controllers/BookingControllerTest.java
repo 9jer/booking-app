@@ -67,7 +67,6 @@ class BookingControllerTest {
         bookingDTO.setPropertyId(1L);
         bookingDTO.setCheckInDate(LocalDate.now().plusDays(1));
         bookingDTO.setCheckOutDate(LocalDate.now().plusDays(3));
-        bookingDTO.setStatus(BookingStatus.CONFIRMED);
 
         getBookingDTO = new GetBookingDTO();
         getBookingDTO.setId(1L);
