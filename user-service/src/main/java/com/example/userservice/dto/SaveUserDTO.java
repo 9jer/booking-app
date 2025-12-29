@@ -23,10 +23,14 @@ public class SaveUserDTO {
     @NotEmpty(message = "Please confirm the password!")
     private String confirmPassword;
 
-    @NotEmpty(message = "Name should not be empty!")
-    private String name;
+    @NotEmpty(message = "First name should not be empty!")
+    private String firstName;
+
+    @NotEmpty(message = "Last name should not be empty!")
+    private String lastName;
 
     @NotEmpty(message = "Phone should not be empty!")
     private String phone;
 
+    private String role;
 }

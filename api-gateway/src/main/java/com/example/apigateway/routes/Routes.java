@@ -4,7 +4,6 @@ import org.springframework.cloud.gateway.route.RouteLocator;
 import org.springframework.cloud.gateway.route.builder.RouteLocatorBuilder;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.web.servlet.function.*;
 
 @Configuration
 public class Routes {
@@ -20,6 +19,12 @@ public class Routes {
                         .uri("lb://booking-service"))
 
                 .route("property_service", r -> r.path("/api/v1/properties/**")
+                        .uri("lb://property-service"))
+
+                .route("image_service", r -> r.path("/api/v1/images/**")
+                        .uri("lb://property-service"))
+
+                .route("features_service", r -> r.path("/api/v1/features/**")
                         .uri("lb://property-service"))
 
                 .route("property_service_swagger", r -> r.path("/aggregate/property-service/v3/api-docs")

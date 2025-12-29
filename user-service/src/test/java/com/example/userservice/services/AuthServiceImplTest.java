@@ -3,6 +3,8 @@ package com.example.userservice.services;
 import com.example.userservice.dto.JwtRequest;
 import com.example.userservice.dto.JwtResponse;
 import com.example.userservice.dto.SaveUserDTO;
+import com.example.userservice.dto.UserDTO;
+import com.example.userservice.models.Role;
 import com.example.userservice.models.User;
 import com.example.userservice.security.CustomUserDetails;
 import com.example.userservice.security.CustomUserDetailsService;
@@ -45,12 +47,16 @@ class AuthServiceImplTest {
     @Mock
     private ModelMapper modelMapper;
 
+    @Mock
+    private RoleService roleService;
+
     @InjectMocks
     private AuthServiceImpl authService;
 
     private JwtRequest jwtRequest;
     private SaveUserDTO saveUserDTO;
     private User user;
+    private UserDTO userDTO;
     private CustomUserDetails userDetails;
 
     @BeforeEach
@@ -64,13 +70,19 @@ class AuthServiceImplTest {
         saveUserDTO.setEmail("test@example.com");
         saveUserDTO.setPassword("password");
         saveUserDTO.setConfirmPassword("password");
-        saveUserDTO.setName("Test User");
+        saveUserDTO.setFirstName("Test");
+        saveUserDTO.setLastName("User");
         saveUserDTO.setPhone("1234567890");
+        saveUserDTO.setRole("ROLE_GUEST");
 
         user = new User();
         user.setId(1L);
         user.setUsername("testuser");
         user.setEmail("test@example.com");
+
+        userDTO = new UserDTO();
+        userDTO.setId(1L);
+        userDTO.setUsername("testuser");
 
         userDetails = new CustomUserDetails(user);
     }
@@ -115,15 +127,21 @@ class AuthServiceImplTest {
         when(userService.findByUsername("testuser")).thenReturn(Optional.empty());
         when(userService.findByEmail("test@example.com")).thenReturn(Optional.empty());
         when(modelMapper.map(saveUserDTO, User.class)).thenReturn(user);
-        when(userService.createNewUser(user)).thenReturn(user);
+
+        Role guestRole = new Role();
+        guestRole.setName("ROLE_GUEST");
+        when(roleService.findByName(anyString())).thenReturn(guestRole);
+
+        when(userService.createNewUser(user)).thenReturn(userDTO);
 
         // When
-        User result = authService.createNewUser(saveUserDTO);
+        UserDTO result = authService.createNewUser(saveUserDTO);
 
         // Then
         assertNotNull(result);
         assertEquals("testuser", result.getUsername());
         verify(userService, times(1)).createNewUser(user);
+        verify(roleService, times(1)).findByName(anyString());
     }
 
     @Test
@@ -155,4 +173,28 @@ class AuthServiceImplTest {
         verify(userService, never()).createNewUser(any(User.class));
     }
 
+    @Test
+    @Transactional
+    void createNewUser_InvalidRole_DefaultsToGuest() {
+        // Given
+        saveUserDTO.setRole("INVALID_ROLE_NAME");
+
+        when(userService.findByUsername("testuser")).thenReturn(Optional.empty());
+        when(userService.findByEmail("test@example.com")).thenReturn(Optional.empty());
+        when(modelMapper.map(saveUserDTO, User.class)).thenReturn(user);
+
+        Role guestRole = new Role();
+        guestRole.setName("ROLE_GUEST");
+        when(roleService.findByName("ROLE_GUEST")).thenReturn(guestRole);
+
+        when(userService.createNewUser(user)).thenReturn(userDTO);
+
+        // When
+        UserDTO result = authService.createNewUser(saveUserDTO);
+
+        // Then
+        assertNotNull(result);
+        verify(roleService).findByName("ROLE_GUEST");
+        verify(userService).createNewUser(user);
+    }
 }

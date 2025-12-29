@@ -6,13 +6,18 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import java.io.Serial;
+import java.io.Serializable;
 import java.util.List;
 
 @Setter
 @Getter
 @AllArgsConstructor
 @NoArgsConstructor
-public class UserDTO {
+public class UserDTO implements Serializable {
+
+    @Serial
+    private static final long serialVersionUID = 1L;
 
     private Long id;
 
@@ -22,8 +27,11 @@ public class UserDTO {
     @NotEmpty(message = "Email should not be empty!")
     private String email;
 
-    @NotEmpty(message = "Name should not be empty!")
-    private String name;
+    @NotEmpty(message = "First name should not be empty!")
+    private String firstName;
+
+    @NotEmpty(message = "Last name should not be empty!")
+    private String lastName;
 
     @NotEmpty(message = "Phone should not be empty!")
     private String phone;

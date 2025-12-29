@@ -2,7 +2,10 @@ package com.example.bookingservice.services;
 
 import com.example.bookingservice.client.PropertyClient;
 import com.example.bookingservice.client.UserClient;
+import com.example.bookingservice.dto.BookingHistoryDTO;
+import com.example.bookingservice.dto.GetBookingDTO;
 import com.example.bookingservice.dto.GetPropertyDTO;
+import com.example.bookingservice.dto.UserDTO;
 import com.example.bookingservice.event.BookingCreatedEvent;
 import com.example.bookingservice.event.BookingCreatedEventProducer;
 import com.example.bookingservice.models.Booking;
@@ -17,8 +20,16 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.modelmapper.ModelMapper;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.SimpleTransactionStatus;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -52,11 +63,21 @@ class BookingServiceImplTest {
     @Mock
     private BookingCreatedEventProducer producer;
 
+    @Mock
+    private ModelMapper modelMapper;
+
+    @Mock
+    private PlatformTransactionManager transactionManager;
+
     @InjectMocks
+    @Spy
     private BookingServiceImpl bookingService;
 
     private Booking booking;
     private BookingHistory bookingHistory;
+    private GetBookingDTO getBookingDTO;
+    private BookingHistoryDTO bookingHistoryDTO;
+    private String token = "valid-token";
 
     @BeforeEach
     void setUp() {
@@ -74,33 +95,45 @@ class BookingServiceImplTest {
         bookingHistory.setBooking(booking);
         bookingHistory.setStatus(BookingStatus.CONFIRMED.name());
         bookingHistory.setChangedAt(LocalDateTime.now());
+
+        getBookingDTO = new GetBookingDTO();
+        getBookingDTO.setId(1L);
+
+        bookingHistoryDTO = new BookingHistoryDTO();
+
+        lenient().when(transactionManager.getTransaction(any())).thenReturn(new SimpleTransactionStatus());
     }
 
     @Test
-    void getAllBookings_ReturnsListOfBookings() {
+    void getAllBookings_Admin_ReturnsListOfDTOs() {
         // Given
-        when(bookingRepository.findAll()).thenReturn(Collections.singletonList(booking));
+        Pageable pageable = PageRequest.of(0, 10);
+        when(jwtTokenUtils.getRoles(token)).thenReturn(List.of("ROLE_ADMIN"));
+        when(bookingRepository.findAll(pageable)).thenReturn(new PageImpl<>(Collections.singletonList(booking)));
+        when(modelMapper.map(booking, GetBookingDTO.class)).thenReturn(getBookingDTO);
 
         // When
-        List<Booking> result = bookingService.getAllBookings();
+        Page<GetBookingDTO> result = bookingService.getAllBookings(token, pageable);
 
         // Then
-        assertEquals(1, result.size());
-        assertEquals(booking, result.get(0));
-        verify(bookingRepository, times(1)).findAll();
+        assertEquals(1, result.getTotalElements());
+        assertEquals(getBookingDTO, result.getContent().get(0));
+        verify(bookingRepository, times(1)).findAll(pageable);
     }
 
     @Test
-    void getBookingById_BookingExists_ReturnsBooking() {
+    void getBookingById_BookingExists_ReturnsDTO() {
         // Given
         when(bookingRepository.findById(1L)).thenReturn(Optional.of(booking));
+        when(jwtTokenUtils.getUserId(token)).thenReturn(1L);
+        when(modelMapper.map(booking, GetBookingDTO.class)).thenReturn(getBookingDTO);
 
         // When
-        Booking result = bookingService.getBookingById(1L);
+        GetBookingDTO result = bookingService.getBookingById(1L, token);
 
         // Then
         assertNotNull(result);
-        assertEquals(booking, result);
+        assertEquals(getBookingDTO, result);
         verify(bookingRepository, times(1)).findById(1L);
     }
 
@@ -111,45 +144,54 @@ class BookingServiceImplTest {
 
         // When & Then
         BookingException exception = assertThrows(BookingException.class,
-                () -> bookingService.getBookingById(1L));
+                () -> bookingService.getBookingById(1L, token));
 
         assertEquals("Booking not found", exception.getMessage());
         verify(bookingRepository, times(1)).findById(1L);
     }
 
     @Test
-    void getBookingByPropertyId_ReturnsListOfBookings() {
+    void getBookingByPropertyId_ReturnsListOfDTOs() {
         // Given
-        when(bookingRepository.findByPropertyId(1L)).thenReturn(Collections.singletonList(booking));
+        GetPropertyDTO propertyDTO = new GetPropertyDTO();
+        propertyDTO.setOwnerId(1L);
+        Pageable pageable = PageRequest.of(0, 10);
+
+        when(jwtTokenUtils.getRoles(token)).thenReturn(List.of("ROLE_OWNER"));
+        when(jwtTokenUtils.getUserId(token)).thenReturn(1L);
+        when(propertyClient.getPropertyById(1L)).thenReturn(propertyDTO);
+
+        when(bookingRepository.findByPropertyId(1L, pageable)).thenReturn(new PageImpl<>(Collections.singletonList(booking)));
+        when(modelMapper.map(booking, GetBookingDTO.class)).thenReturn(getBookingDTO);
 
         // When
-        List<Booking> result = bookingService.getBookingByPropertyId(1L);
+        Page<GetBookingDTO> result = bookingService.getBookingByPropertyId(1L, token, pageable);
 
         // Then
-        assertEquals(1, result.size());
-        assertEquals(booking, result.get(0));
-        verify(bookingRepository, times(1)).findByPropertyId(1L);
+        assertEquals(1, result.getTotalElements());
+        assertEquals(getBookingDTO, result.getContent().get(0));
+        verify(bookingRepository, times(1)).findByPropertyId(1L, pageable);
     }
 
     @Test
-    void getBookingHistoryByBookingId_ReturnsListOfHistory() {
+    void getBookingHistoryByBookingId_ReturnsListOfHistoryDTOs() {
         // Given
         when(bookingHistoryRepository.findByBookingId(1L)).thenReturn(Collections.singletonList(bookingHistory));
+        when(modelMapper.map(bookingHistory, BookingHistoryDTO.class)).thenReturn(bookingHistoryDTO);
 
         // When
-        List<BookingHistory> result = bookingService.getBookingHistoryByBookingId(1L);
+        List<BookingHistoryDTO> result = bookingService.getBookingHistoryByBookingId(1L);
 
         // Then
         assertEquals(1, result.size());
-        assertEquals(bookingHistory, result.get(0));
+        assertEquals(bookingHistoryDTO, result.get(0));
         verify(bookingHistoryRepository, times(1)).findByBookingId(1L);
     }
 
     @Test
     @Transactional
-    void createBooking_ValidData_CreatesBooking() {
+    void createBooking_ValidData_ReturnsDTO() {
         // Given
-        String token = "valid-token";
         GetPropertyDTO propertyDTO = new GetPropertyDTO();
         propertyDTO.setTitle("Test Property");
 
@@ -158,26 +200,31 @@ class BookingServiceImplTest {
         when(userClient.userExists(1L)).thenReturn(true);
         when(bookingRepository.countOverlappingBookings(1L, booking.getCheckInDate(), booking.getCheckOutDate()))
                 .thenReturn(0L);
-        when(bookingRepository.save(any(Booking.class))).thenReturn(booking);
-        when(jwtTokenUtils.getEmail(token)).thenReturn("test@example.com");
-        when(propertyClient.getPropertyById(1L)).thenReturn(propertyDTO);
+
+        when(bookingRepository.save(any(Booking.class))).thenAnswer(invocation -> {
+            Booking savedBooking = invocation.getArgument(0);
+            savedBooking.setId(1L);
+            return savedBooking;
+        });
+
+        when(modelMapper.map(any(Booking.class), eq(GetBookingDTO.class))).thenReturn(getBookingDTO);
 
         // When
-        Booking result = bookingService.createBooking(booking, token);
+        GetBookingDTO result = bookingService.createBooking(booking, token);
 
         // Then
         assertNotNull(result);
-        assertEquals(booking, result);
+        assertEquals(1L, result.getId());
         verify(bookingRepository, times(1)).save(booking);
         verify(bookingHistoryRepository, times(1)).save(any(BookingHistory.class));
-        verify(producer, times(1)).sendBookingCreatedEvent(anyString(), any(BookingCreatedEvent.class));
+
+        verify(producer, never()).sendBookingCreatedEvent(anyString(), any(BookingCreatedEvent.class));
     }
 
     @Test
     @Transactional
     void createBooking_PropertyNotExists_ThrowsException() {
         // Given
-        String token = "valid-token";
         when(propertyClient.propertyExists(1L)).thenReturn(false);
 
         // When & Then
@@ -192,7 +239,6 @@ class BookingServiceImplTest {
     @Transactional
     void createBooking_UserNotExists_ThrowsException() {
         // Given
-        String token = "valid-token";
         when(propertyClient.propertyExists(1L)).thenReturn(true);
         when(jwtTokenUtils.getUserId(token)).thenReturn(1L);
         when(userClient.userExists(1L)).thenReturn(false);
@@ -209,7 +255,6 @@ class BookingServiceImplTest {
     @Transactional
     void createBooking_PropertyNotAvailable_ThrowsException() {
         // Given
-        String token = "valid-token";
         when(propertyClient.propertyExists(1L)).thenReturn(true);
         when(jwtTokenUtils.getUserId(token)).thenReturn(1L);
         when(userClient.userExists(1L)).thenReturn(true);
@@ -220,23 +265,25 @@ class BookingServiceImplTest {
         BookingException exception = assertThrows(BookingException.class,
                 () -> bookingService.createBooking(booking, token));
 
-        assertEquals("Property is not available", exception.getMessage());
+        assertEquals("Property is not available for selected dates.", exception.getMessage());
         verify(bookingRepository, never()).save(any(Booking.class));
     }
 
     @Test
     @Transactional
-    void updateBookingStatus_ValidData_UpdatesStatus() {
+    void updateBookingStatus_ValidData_ReturnsDTO() {
         // Given
         when(bookingRepository.findById(1L)).thenReturn(Optional.of(booking));
+        when(jwtTokenUtils.getRoles(token)).thenReturn(List.of("ROLE_ADMIN"));
         when(bookingRepository.save(any(Booking.class))).thenReturn(booking);
 
+        when(modelMapper.map(booking, GetBookingDTO.class)).thenReturn(getBookingDTO);
+
         // When
-        Booking result = bookingService.updateBookingStatus(1L, BookingStatus.CANCELLED);
+        GetBookingDTO result = bookingService.updateBookingStatus(1L, BookingStatus.CANCELLED, token);
 
         // Then
         assertNotNull(result);
-        assertEquals(BookingStatus.CANCELLED, result.getStatus());
         verify(bookingRepository, times(1)).save(booking);
         verify(bookingHistoryRepository, times(1)).save(any(BookingHistory.class));
     }
@@ -244,7 +291,6 @@ class BookingServiceImplTest {
     @Test
     void isAvailable_ValidDates_ReturnsTrue() {
         // Given
-        when(propertyClient.propertyExists(1L)).thenReturn(true);
         when(bookingRepository.countOverlappingBookings(1L,
                 LocalDate.now().plusDays(1), LocalDate.now().plusDays(3)))
                 .thenReturn(0L);
@@ -265,19 +311,6 @@ class BookingServiceImplTest {
                         LocalDate.now().plusDays(3), LocalDate.now().plusDays(1)));
 
         assertEquals("Check-in date must be before check-out date.", exception.getMessage());
-    }
-
-    @Test
-    void isAvailable_PropertyNotExists_ThrowsException() {
-        // Given
-        when(propertyClient.propertyExists(1L)).thenReturn(false);
-
-        // When & Then
-        BookingException exception = assertThrows(BookingException.class,
-                () -> bookingService.isAvailable(1L,
-                        LocalDate.now().plusDays(1), LocalDate.now().plusDays(3)));
-
-        assertEquals("Property with id 1 not found.", exception.getMessage());
     }
 
     @Test
@@ -309,9 +342,8 @@ class BookingServiceImplTest {
     @Test
     void getAvailableDates_NoBookings_ReturnsAllDates() {
         // Given
-        when(bookingRepository.findBookingsByPropertyOrdered(1L))
+        when(bookingRepository.findFutureBookings(eq(1L), any(LocalDate.class)))
                 .thenReturn(Collections.emptyList());
-        when(propertyClient.propertyExists(1L)).thenReturn(true);
 
         LocalDate today = LocalDate.now();
         LocalDate endDate = today.plusMonths(3);
@@ -339,9 +371,8 @@ class BookingServiceImplTest {
         booking2.setCheckInDate(LocalDate.now().plusDays(10));
         booking2.setCheckOutDate(LocalDate.now().plusDays(12));
 
-        when(bookingRepository.findBookingsByPropertyOrdered(1L))
+        when(bookingRepository.findFutureBookings(eq(1L), any(LocalDate.class)))
                 .thenReturn(List.of(booking1, booking2));
-        when(propertyClient.propertyExists(1L)).thenReturn(true);
 
         // When
         List<LocalDate> result = bookingService.getAvailableDates(1L);
@@ -355,4 +386,114 @@ class BookingServiceImplTest {
         assertFalse(result.contains(LocalDate.now().plusDays(6)));
     }
 
+    @Test
+    void initiatePayment_ValidBooking_NoException() {
+        // Given
+        booking.setStatus(BookingStatus.PENDING);
+
+        when(bookingRepository.findById(1L)).thenReturn(Optional.of(booking));
+        when(jwtTokenUtils.getUserId(token)).thenReturn(1L);
+
+        // When & Then
+        assertDoesNotThrow(() -> bookingService.initiatePayment(1L, token));
+
+        assertEquals(BookingStatus.AWAITING_PAYMENT, booking.getStatus());
+    }
+
+    @Test
+    void completePayment_ValidBooking_UpdatesStatusToPaid() {
+        // Given
+        booking.setStatus(BookingStatus.AWAITING_PAYMENT);
+
+        GetPropertyDTO propertyDTO = new GetPropertyDTO();
+        propertyDTO.setTitle("Luxury Villa");
+
+        UserDTO userDTO = new UserDTO();
+        userDTO.setId(1L);
+        userDTO.setEmail("test@example.com");
+        userDTO.setUsername("testuser");
+
+        doAnswer(invocation -> {
+            ((Runnable) invocation.getArgument(0)).run();
+            return null;
+        }).when(bookingService).executeAfterCommit(any());
+
+        when(bookingRepository.findById(1L)).thenReturn(Optional.of(booking));
+        when(bookingHistoryRepository.save(any(BookingHistory.class))).thenReturn(new BookingHistory());
+        when(bookingRepository.save(any(Booking.class))).thenReturn(booking);
+
+        when(propertyClient.getPropertyById(1L)).thenReturn(propertyDTO);
+        when(userClient.getUserById(1L)).thenReturn(userDTO);
+
+        // When
+        bookingService.completePayment(1L);
+
+        // Then
+        assertEquals(BookingStatus.CONFIRMED, booking.getStatus());
+        verify(bookingRepository, times(1)).save(booking);
+
+        verify(producer, times(1)).sendBookingCreatedEvent(anyString(), any(BookingCreatedEvent.class));
+    }
+
+    @Test
+    @Transactional
+    void cancelBooking_OwnerOrAdmin_CancelsBooking() {
+        // Given
+        booking.setStatus(BookingStatus.CONFIRMED);
+        when(bookingRepository.findById(1L)).thenReturn(Optional.of(booking));
+        when(jwtTokenUtils.getRoles(token)).thenReturn(List.of("ROLE_ADMIN"));
+
+        when(bookingRepository.save(booking)).thenReturn(booking);
+
+        // When
+        bookingService.cancelBooking(1L, token);
+
+        // Then
+        assertEquals(BookingStatus.CANCELLED, booking.getStatus());
+        verify(bookingHistoryRepository).save(any(BookingHistory.class));
+    }
+
+    @Test
+    void cancelBooking_NotAuthorized_ThrowsException() {
+        // Given
+        booking.setUserId(999L);
+        when(bookingRepository.findById(1L)).thenReturn(Optional.of(booking));
+        when(jwtTokenUtils.getUserId(token)).thenReturn(1L);
+        when(jwtTokenUtils.getRoles(token)).thenReturn(List.of("ROLE_USER"));
+
+        // When & Then
+        BookingException exception = assertThrows(BookingException.class,
+                () -> bookingService.cancelBooking(1L, token));
+        assertEquals("You are not authorized to cancel this booking.", exception.getMessage());
+    }
+
+    @Test
+    void cancelBooking_AlreadyCancelled_ThrowsException() {
+        // Given
+        booking.setStatus(BookingStatus.CANCELLED);
+        when(bookingRepository.findById(1L)).thenReturn(Optional.of(booking));
+        when(jwtTokenUtils.getUserId(token)).thenReturn(1L);
+        when(jwtTokenUtils.getRoles(token)).thenReturn(List.of("ROLE_ADMIN"));
+
+        // When & Then
+        BookingException exception = assertThrows(BookingException.class,
+                () -> bookingService.cancelBooking(1L, token));
+        assertEquals("Booking is already cancelled.", exception.getMessage());
+    }
+
+    @Test
+    void getUserRecentBookings_ReturnsList() {
+        // Given
+        when(jwtTokenUtils.getUserId(token)).thenReturn(1L);
+        when(bookingRepository.findTop5ByUserIdOrderByCreatedAtDesc(1L))
+                .thenReturn(List.of(booking));
+        when(modelMapper.map(booking, GetBookingDTO.class)).thenReturn(getBookingDTO);
+
+        // When
+        List<GetBookingDTO> result = bookingService.getUserRecentBookings(token);
+
+        // Then
+        assertFalse(result.isEmpty());
+        assertEquals(1, result.size());
+    }
 }

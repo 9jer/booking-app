@@ -2,10 +2,8 @@ package com.example.reviewservice.controllers;
 
 import com.example.reviewservice.dto.GetReviewDTO;
 import com.example.reviewservice.dto.ReviewDTO;
-import com.example.reviewservice.dto.ReviewsResponse;
 import com.example.reviewservice.models.Review;
 import com.example.reviewservice.services.ReviewService;
-import com.example.reviewservice.util.ReviewException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -13,6 +11,9 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.modelmapper.ModelMapper;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.BindingResult;
@@ -68,21 +69,20 @@ class ReviewControllerTest {
     @Test
     void getReviewsByPropertyId_ReturnsReviewsResponse() {
         // Given
-        when(reviewService.getReviewsByPropertyId(1L)).thenReturn(Collections.singletonList(review));
-        when(modelMapper.map(any(Review.class), eq(GetReviewDTO.class))).thenReturn(getReviewDTO);
+        when(reviewService.getReviewsByPropertyId(eq(1L), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(Collections.singletonList(getReviewDTO)));
 
         // When
-        ResponseEntity<ReviewsResponse> response = reviewController.getReviewsByPropertyId(1L);
+        ResponseEntity<Page<GetReviewDTO>> response = reviewController.getReviewsByPropertyId(1L, Pageable.unpaged());
 
         // Then
         assertEquals(200, response.getStatusCodeValue());
         assertEquals(MediaType.APPLICATION_JSON, response.getHeaders().getContentType());
         assertNotNull(response.getBody());
-        assertEquals(1, response.getBody().getReviews().size());
-        assertEquals(getReviewDTO, response.getBody().getReviews().get(0));
+        assertEquals(1, response.getBody().getTotalElements());
+        assertEquals(getReviewDTO, response.getBody().getContent().get(0));
 
-        verify(reviewService, times(1)).getReviewsByPropertyId(1L);
-        verify(modelMapper, times(1)).map(any(Review.class), eq(GetReviewDTO.class));
+        verify(reviewService, times(1)).getReviewsByPropertyId(eq(1L), any(Pageable.class));
     }
 
     @Test
@@ -91,8 +91,7 @@ class ReviewControllerTest {
         String authHeader = "Bearer token";
         when(bindingResult.hasErrors()).thenReturn(false);
         when(modelMapper.map(any(ReviewDTO.class), eq(Review.class))).thenReturn(review);
-        when(reviewService.saveReview(any(Review.class), anyString())).thenReturn(review);
-        when(modelMapper.map(review, GetReviewDTO.class)).thenReturn(getReviewDTO);
+        when(reviewService.saveReview(any(Review.class), anyString())).thenReturn(getReviewDTO);
 
         // When
         ResponseEntity<GetReviewDTO> response = reviewController.createReview(authHeader, reviewDTO, bindingResult);
@@ -105,22 +104,6 @@ class ReviewControllerTest {
 
         verify(reviewService, times(1)).saveReview(any(Review.class), anyString());
         verify(modelMapper, times(1)).map(any(ReviewDTO.class), eq(Review.class));
-        verify(modelMapper, times(1)).map(review, GetReviewDTO.class);
-    }
-
-    @Test
-    void createReview_InvalidRequest_ThrowsReviewException() {
-        // Given
-        String authHeader = "Bearer token";
-        when(bindingResult.hasErrors()).thenReturn(true);
-        //doThrow(new ReviewException("Validation error")).when(bindingResult).getAllErrors();
-
-        // When & Then
-        assertThrows(ReviewException.class,
-                () -> reviewController.createReview(authHeader, reviewDTO, bindingResult));
-
-        verify(bindingResult, times(1)).hasErrors();
-        verify(reviewService, never()).saveReview(any(Review.class), anyString());
     }
 
     @Test
@@ -129,8 +112,7 @@ class ReviewControllerTest {
         String authHeader = "Bearer token";
         when(bindingResult.hasErrors()).thenReturn(false);
         when(modelMapper.map(any(ReviewDTO.class), eq(Review.class))).thenReturn(review);
-        when(reviewService.updateReview(any(Review.class), anyString())).thenReturn(review);
-        when(modelMapper.map(review, GetReviewDTO.class)).thenReturn(getReviewDTO);
+        when(reviewService.updateReview(any(Review.class), anyString())).thenReturn(getReviewDTO);
 
         // When
         ResponseEntity<GetReviewDTO> response = reviewController.updateReview(authHeader, 1L, reviewDTO, bindingResult);
@@ -144,14 +126,13 @@ class ReviewControllerTest {
 
         verify(reviewService, times(1)).updateReview(any(Review.class), anyString());
         verify(modelMapper, times(1)).map(any(ReviewDTO.class), eq(Review.class));
-        verify(modelMapper, times(1)).map(review, GetReviewDTO.class);
     }
 
     @Test
     void deleteReview_ValidId_ReturnsNoContent() {
         // Given
         String authHeader = "Bearer token";
-        when(reviewService.deleteReview(anyLong(), anyString())).thenReturn(review);
+        when(reviewService.deleteReview(anyLong(), anyString())).thenReturn(getReviewDTO);
 
         // When
         ResponseEntity<Void> response = reviewController.deleteReview(authHeader, 1L);

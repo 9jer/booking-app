@@ -13,6 +13,9 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.modelmapper.ModelMapper;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -48,6 +51,7 @@ class BookingControllerTest {
     private GetBookingDTO getBookingDTO;
     private BookingHistory bookingHistory;
     private BookingHistoryDTO bookingHistoryDTO;
+    private String authHeader = "Bearer token";
 
     @BeforeEach
     void setUp() {
@@ -63,7 +67,6 @@ class BookingControllerTest {
         bookingDTO.setPropertyId(1L);
         bookingDTO.setCheckInDate(LocalDate.now().plusDays(1));
         bookingDTO.setCheckOutDate(LocalDate.now().plusDays(3));
-        bookingDTO.setStatus(BookingStatus.CONFIRMED);
 
         getBookingDTO = new GetBookingDTO();
         getBookingDTO.setId(1L);
@@ -78,38 +81,37 @@ class BookingControllerTest {
         bookingHistory.setStatus(String.valueOf(BookingStatus.CONFIRMED));
 
         bookingHistoryDTO = new BookingHistoryDTO();
-        bookingHistoryDTO.setBooking(booking);
         bookingHistoryDTO.setStatus(String.valueOf(BookingStatus.CONFIRMED));
     }
 
     @Test
     void getAllBookings_ReturnsValidResponseEntity() {
         // Given
-        when(bookingService.getAllBookings()).thenReturn(Collections.singletonList(booking));
-        when(modelMapper.map(any(Booking.class), eq(GetBookingDTO.class))).thenReturn(getBookingDTO);
+        when(bookingService.getAllBookings(anyString(), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(Collections.singletonList(getBookingDTO)));
 
         // When
-        ResponseEntity<BookingsResponse> response = bookingController.getAllBookings();
+        ResponseEntity<Page<GetBookingDTO>> response = bookingController.getAllBookings(authHeader, Pageable.unpaged());
 
         // Then
         assertEquals(200, response.getStatusCodeValue());
         assertEquals(MediaType.APPLICATION_JSON, response.getHeaders().getContentType());
         assertNotNull(response.getBody());
-        assertEquals(1, response.getBody().getBookings().size());
-        assertEquals(getBookingDTO, response.getBody().getBookings().get(0));
 
-        verify(bookingService, times(1)).getAllBookings();
-        verify(modelMapper, times(1)).map(any(Booking.class), eq(GetBookingDTO.class));
+        assertEquals(1, response.getBody().getTotalElements());
+        assertEquals(getBookingDTO, response.getBody().getContent().get(0));
+
+        verify(bookingService, times(1)).getAllBookings(anyString(), any(Pageable.class));
+        verify(modelMapper, never()).map(any(Booking.class), eq(GetBookingDTO.class));
     }
 
     @Test
     void getBookingById_BookingExists_ReturnsValidResponseEntity() {
         // Given
-        when(bookingService.getBookingById(1L)).thenReturn(booking);
-        when(modelMapper.map(any(Booking.class), eq(GetBookingDTO.class))).thenReturn(getBookingDTO);
+        when(bookingService.getBookingById(eq(1L), anyString())).thenReturn(getBookingDTO);
 
         // When
-        ResponseEntity<GetBookingDTO> response = bookingController.getBookingById(1L);
+        ResponseEntity<GetBookingDTO> response = bookingController.getBookingById(1L, authHeader);
 
         // Then
         assertEquals(200, response.getStatusCodeValue());
@@ -117,26 +119,24 @@ class BookingControllerTest {
         assertNotNull(response.getBody());
         assertEquals(getBookingDTO, response.getBody());
 
-        verify(bookingService, times(1)).getBookingById(1L);
-        verify(modelMapper, times(1)).map(any(Booking.class), eq(GetBookingDTO.class));
+        verify(bookingService, times(1)).getBookingById(eq(1L), anyString());
+        verify(modelMapper, never()).map(any(Booking.class), eq(GetBookingDTO.class));
     }
 
     @Test
     void getBookingById_BookingNotExists_ThrowsBookingException() {
         // Given
-        when(bookingService.getBookingById(1L)).thenThrow(new BookingException("Booking not found"));
+        when(bookingService.getBookingById(eq(1L), anyString())).thenThrow(new BookingException("Booking not found"));
 
         // When & Then
-        assertThrows(BookingException.class, () -> bookingController.getBookingById(1L));
-        verify(bookingService, times(1)).getBookingById(1L);
-        verify(modelMapper, never()).map(any(Booking.class), eq(GetBookingDTO.class));
+        assertThrows(BookingException.class, () -> bookingController.getBookingById(1L, authHeader));
+        verify(bookingService, times(1)).getBookingById(eq(1L), anyString());
     }
 
     @Test
     void getBookingHistoryById_HistoryExists_ReturnsValidResponseEntity() {
         // Given
-        when(bookingService.getBookingHistoryByBookingId(1L)).thenReturn(Collections.singletonList(bookingHistory));
-        when(modelMapper.map(any(BookingHistory.class), eq(BookingHistoryDTO.class))).thenReturn(bookingHistoryDTO);
+        when(bookingService.getBookingHistoryByBookingId(1L)).thenReturn(Collections.singletonList(bookingHistoryDTO));
 
         // When
         ResponseEntity<BookingHistoryResponse> response = bookingController.getBookingHistoryById(1L);
@@ -150,17 +150,15 @@ class BookingControllerTest {
         assertEquals(bookingHistoryDTO, response.getBody().getHistory().get(0));
 
         verify(bookingService, times(1)).getBookingHistoryByBookingId(1L);
-        verify(modelMapper, times(1)).map(any(BookingHistory.class), eq(BookingHistoryDTO.class));
+        verify(modelMapper, never()).map(any(BookingHistory.class), eq(BookingHistoryDTO.class));
     }
 
     @Test
     void createBooking_ValidRequest_ReturnsCreatedResponse() {
         // Given
-        String authHeader = "Bearer token";
         when(bindingResult.hasErrors()).thenReturn(false);
         when(modelMapper.map(any(BookingDTO.class), eq(Booking.class))).thenReturn(booking);
-        when(bookingService.createBooking(any(Booking.class), anyString())).thenReturn(booking);
-        when(modelMapper.map(booking, GetBookingDTO.class)).thenReturn(getBookingDTO);
+        when(bookingService.createBooking(any(Booking.class), anyString())).thenReturn(getBookingDTO);
 
         // When
         ResponseEntity<GetBookingDTO> response = bookingController.createBooking(authHeader, bookingDTO, bindingResult);
@@ -175,13 +173,11 @@ class BookingControllerTest {
 
         verify(bookingService, times(1)).createBooking(any(Booking.class), anyString());
         verify(modelMapper, times(1)).map(any(BookingDTO.class), eq(Booking.class));
-        verify(modelMapper, times(1)).map(booking, GetBookingDTO.class);
     }
 
     @Test
     void createBooking_InvalidRequest_ThrowsBookingException() {
         // Given
-        String authHeader = "Bearer token";
         when(bindingResult.hasErrors()).thenReturn(true);
 
         // When & Then
@@ -195,11 +191,11 @@ class BookingControllerTest {
     @Test
     void updateBookingStatus_ValidRequest_ReturnsUpdatedBooking() {
         // Given
-        when(bookingService.updateBookingStatus(1L, BookingStatus.CANCELLED)).thenReturn(booking);
-        when(modelMapper.map(booking, GetBookingDTO.class)).thenReturn(getBookingDTO);
+        when(bookingService.updateBookingStatus(eq(1L), eq(BookingStatus.CANCELLED), anyString()))
+                .thenReturn(getBookingDTO);
 
         // When
-        ResponseEntity<GetBookingDTO> response = bookingController.updateBookingStatus(1L, BookingStatus.CANCELLED);
+        ResponseEntity<GetBookingDTO> response = bookingController.updateBookingStatus(authHeader, 1L, BookingStatus.CANCELLED);
 
         // Then
         assertEquals(200, response.getStatusCodeValue());
@@ -207,8 +203,8 @@ class BookingControllerTest {
         assertNotNull(response.getBody());
         assertEquals(getBookingDTO, response.getBody());
 
-        verify(bookingService, times(1)).updateBookingStatus(1L, BookingStatus.CANCELLED);
-        verify(modelMapper, times(1)).map(booking, GetBookingDTO.class);
+        verify(bookingService, times(1)).updateBookingStatus(eq(1L), eq(BookingStatus.CANCELLED), anyString());
+        verify(modelMapper, never()).map(any(Booking.class), eq(GetBookingDTO.class));
     }
 
     @Test

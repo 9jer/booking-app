@@ -1,9 +1,10 @@
 {
-    "type": "record",
-    "name": "RatingUpdatedEvent",
-    "namespace": "com.example.reviewservice.event",
-    "fields": [
-        { "name": "propertyId", "type": "long" },
-        { "name": "rating", "type": "int" }
-    ]
+  "type": "record",
+  "name": "RatingUpdatedEvent",
+  "namespace": "com.example.reviewservice.event",
+  "fields": [
+    { "name": "propertyId", "type": "long" },
+    { "name": "newAverageRating", "type": "double" },
+    { "name": "totalReviews", "type": "long" }
+  ]
 }

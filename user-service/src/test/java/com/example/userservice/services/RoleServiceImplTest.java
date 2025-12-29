@@ -87,4 +87,36 @@ class RoleServiceImplTest {
         assertEquals("Role OWNER not found", exception.getMessage());
         verify(roleRepository, times(1)).findByName("ROLE_OWNER");
     }
+
+    @Test
+    void findByName_WhenRoleExists_ReturnsRole() {
+        // Given
+        String roleName = "ROLE_USER";
+        Role role = new Role();
+        role.setName(roleName);
+
+        when(roleRepository.findByName(roleName)).thenReturn(Optional.of(role));
+
+        // When
+        Role result = roleService.findByName(roleName);
+
+        // Then
+        assertNotNull(result);
+        assertEquals(roleName, result.getName());
+        verify(roleRepository, times(1)).findByName(roleName);
+    }
+
+    @Test
+    void findByName_WhenRoleNotExists_ThrowsException() {
+        // Given
+        String roleName = "ROLE_UNKNOWN";
+        when(roleRepository.findByName(roleName)).thenReturn(Optional.empty());
+
+        // When & Then
+        RuntimeException exception = assertThrows(RuntimeException.class,
+                () -> roleService.findByName(roleName));
+
+        assertEquals("Role not found: " + roleName, exception.getMessage());
+        verify(roleRepository, times(1)).findByName(roleName);
+    }
 }

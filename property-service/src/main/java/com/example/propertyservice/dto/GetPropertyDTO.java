@@ -5,12 +5,18 @@ import jakarta.validation.constraints.NotNull;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.io.Serial;
+import java.io.Serializable;
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.Set;
 
 @Getter
 @Setter
-public class GetPropertyDTO {
+public class GetPropertyDTO implements Serializable {
+
+    @Serial
+    private static final long serialVersionUID = 1L;
 
     private Long id;
 
@@ -35,4 +41,6 @@ public class GetPropertyDTO {
     private Integer capacity;
 
     private Set<PropertyFeatureDTO> features;
+
+    private List<ImageDTO> images;
 }

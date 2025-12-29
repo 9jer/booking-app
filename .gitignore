@@ -8,7 +8,7 @@ property-service/src/main/resources/secrets.properties
 booking-service/src/main/resources/secrets.properties
 api-gateway/src/main/resources/secrets.properties
 notification-service/src/main/resources/secrets.properties
-
+.env
 
 ### IntelliJ IDEA ###
 .idea/modules.xml

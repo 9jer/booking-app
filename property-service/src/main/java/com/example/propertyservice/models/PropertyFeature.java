@@ -10,7 +10,6 @@ import lombok.*;
 @NoArgsConstructor
 @Setter
 @Getter
-@ToString
 public class PropertyFeature {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

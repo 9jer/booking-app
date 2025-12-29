@@ -6,6 +6,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.Set;
 
 @Setter
@@ -23,4 +24,5 @@ public class GetPropertyDTO {
     private BigDecimal pricePerNight;
     private Integer capacity;
     private Set<PropertyFeatureDTO> features;
+    private List<ImageDTO> images;
 }

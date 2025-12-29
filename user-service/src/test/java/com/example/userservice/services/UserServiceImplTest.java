@@ -1,9 +1,11 @@
 package com.example.userservice.services;
 
-import com.example.userservice.dto.SaveUserDTO;
+import com.example.userservice.dto.UpdateUserDTO;
+import com.example.userservice.dto.UserDTO;
 import com.example.userservice.models.Role;
 import com.example.userservice.models.User;
 import com.example.userservice.repositories.UserRepository;
+import com.example.userservice.util.JwtTokenUtils;
 import com.example.userservice.util.UserException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -12,12 +14,9 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.modelmapper.ModelMapper;
-import org.springframework.cache.Cache;
-import org.springframework.cache.CacheManager;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
 import java.util.*;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -40,21 +39,17 @@ class UserServiceImplTest {
     private ModelMapper modelMapper;
 
     @Mock
-    private CacheManager cacheManager;
-
-    @Mock
-    private Cache cache;
-
-    @Mock
-    private UserService self;
+    private JwtTokenUtils jwtTokenUtils;
 
     @InjectMocks
     private UserServiceImpl userService;
 
     private User user;
-    private SaveUserDTO saveUserDTO;
+    private UserDTO userDTO;
+    private UpdateUserDTO updateUserDTO;
     private Role guestRole;
     private Role ownerRole;
+    private String token = "valid-token";
 
     @BeforeEach
     void setUp() {
@@ -63,18 +58,19 @@ class UserServiceImplTest {
         user.setUsername("testuser");
         user.setEmail("test@example.com");
         user.setPassword("encodedPassword");
-        user.setName("Test User");
-        user.setPhone("1234567890");
-        user.setCreatedAt(LocalDateTime.now());
         user.setRoles(new ArrayList<>());
 
-        saveUserDTO = new SaveUserDTO();
-        saveUserDTO.setUsername("testuser");
-        saveUserDTO.setEmail("test@example.com");
-        saveUserDTO.setPassword("password");
-        saveUserDTO.setConfirmPassword("password");
-        saveUserDTO.setName("Test User");
-        saveUserDTO.setPhone("1234567890");
+        userDTO = new UserDTO();
+        userDTO.setId(1L);
+        userDTO.setUsername("testuser");
+        userDTO.setEmail("test@example.com");
+
+        updateUserDTO = new UpdateUserDTO();
+        updateUserDTO.setUsername("testuser");
+        updateUserDTO.setEmail("test@example.com");
+        updateUserDTO.setFirstName("Test");
+        updateUserDTO.setLastName("User");
+        updateUserDTO.setPhone("1234567890");
 
         guestRole = new Role();
         guestRole.setId(1);
@@ -86,182 +82,123 @@ class UserServiceImplTest {
     }
 
     @Test
-    void findByUsername_UserExists_ReturnsUser() {
-        // Given
-        when(userRepository.findByUsername("testuser")).thenReturn(Optional.of(user));
-
-        // When
-        Optional<User> result = userService.findByUsername("testuser");
-
-        // Then
-        assertTrue(result.isPresent());
-        assertEquals(user.getUsername(), result.get().getUsername());
-        verify(userRepository, times(1)).findByUsername("testuser");
-    }
-
-    @Test
-    void findByEmail_UserExists_ReturnsUser() {
-        // Given
-        when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(user));
-
-        // When
-        Optional<User> result = userService.findByEmail("test@example.com");
-
-        // Then
-        assertTrue(result.isPresent());
-        assertEquals(user.getEmail(), result.get().getEmail());
-        verify(userRepository, times(1)).findByEmail("test@example.com");
-    }
-
-    @Test
     @Transactional
     void createNewUser_ValidUser_CreatesAndReturnsUser() {
         // Given
-        User newUser = new User();
-        newUser.setUsername("newuser");
-        newUser.setPassword("password");
+        User inputUser = new User();
+        inputUser.setUsername("newuser");
+        inputUser.setPassword("password");
 
         when(passwordEncoder.encode("password")).thenReturn("encodedPassword");
-        when(roleService.getGuestRole()).thenReturn(guestRole);
+
         when(userRepository.save(any(User.class))).thenAnswer(invocation -> {
             User saved = invocation.getArgument(0);
             saved.setId(2L);
-            saved.setRoles(new ArrayList<>(List.of(guestRole)));
             return saved;
         });
 
+        when(modelMapper.map(any(User.class), eq(UserDTO.class))).thenReturn(userDTO);
+
         // When
-        User result = userService.createNewUser(newUser);
+        UserDTO result = userService.createNewUser(inputUser);
 
         // Then
-        assertNotNull(result.getId());
-        assertEquals("encodedPassword", result.getPassword());
-        assertTrue(result.getRoles().stream().anyMatch(r -> r.getName().equals("ROLE_GUEST")));
-        assertNotNull(result.getCreatedAt());
-        verify(userRepository, times(1)).save(newUser);
+        assertNotNull(result);
+        verify(userRepository, times(1)).save(inputUser);
     }
 
     @Test
-    void findAll_ReturnsAllUsers() {
-        // Given
-        when(userRepository.findAll()).thenReturn(List.of(user));
+    void updateUser_Owner_UpdatesUser() {
+        User updatedUserFromDTO = new User();
+        updatedUserFromDTO.setUsername("newuser");
+        updatedUserFromDTO.setPassword("newpassword");
 
-        // When
-        List<User> result = userService.findAll();
+        when(jwtTokenUtils.getUserId(token)).thenReturn(1L);
 
-        // Then
-        assertEquals(1, result.size());
-        assertEquals(user, result.get(0));
-        verify(userRepository, times(1)).findAll();
+        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+        when(userRepository.findByUsername(anyString())).thenReturn(Optional.empty());
+        when(userRepository.findByEmail(anyString())).thenReturn(Optional.empty());
+
+        when(modelMapper.map(updateUserDTO, User.class)).thenReturn(updatedUserFromDTO);
+
+        when(userRepository.save(user)).thenReturn(user);
+        when(modelMapper.map(user, UserDTO.class)).thenReturn(userDTO);
+
+        UserDTO result = userService.updateUser(updateUserDTO, token);
+
+        assertNotNull(result);
+        verify(userRepository).save(user);
     }
 
     @Test
-    void getUserById_UserExists_ReturnsUser() {
+    void updateUser_EmailAlreadyTaken_ThrowsException() {
         // Given
+        User anotherUser = new User();
+        anotherUser.setId(2L);
+        anotherUser.setEmail("taken@example.com");
+
+        updateUserDTO.setEmail("taken@example.com");
+
+        when(jwtTokenUtils.getUserId(token)).thenReturn(1L);
         when(userRepository.findById(1L)).thenReturn(Optional.of(user));
 
-        // When
-        User result = userService.getUserById(1L);
-
-        // Then
-        assertEquals(user.getId(), result.getId());
-        verify(userRepository, times(1)).findById(1L);
-    }
-
-    @Test
-    void getUserById_UserNotExists_ThrowsException() {
-        // Given
-        when(userRepository.findById(1L)).thenReturn(Optional.empty());
+        when(userRepository.findByUsername(anyString())).thenReturn(Optional.empty());
+        when(userRepository.findByEmail("taken@example.com")).thenReturn(Optional.of(anotherUser));
 
         // When & Then
         UserException exception = assertThrows(UserException.class,
-                () -> userService.getUserById(1L));
-
-        assertEquals("User 1 not found", exception.getMessage());
-        verify(userRepository, times(1)).findById(1L);
-    }
-
-    @Test
-    void updateUserById_ValidData_UpdatesUser() {
-        SaveUserDTO updatedDto = new SaveUserDTO();
-        updatedDto.setUsername("newuser");
-        updatedDto.setEmail("new@example.com");
-        updatedDto.setPassword("newpassword");
-        updatedDto.setConfirmPassword("newpassword");
-        updatedDto.setName("New Name");
-        updatedDto.setPhone("9876543210");
-
-        User existingUser = new User();
-        existingUser.setId(1L);
-        existingUser.setUsername("olduser");
-        existingUser.setRoles(new ArrayList<>());
-
-        User updatedUser = new User();
-        updatedUser.setUsername("newuser");
-        updatedUser.setPassword("newpassword");
-
-        when(cacheManager.getCache(anyString())).thenReturn(cache);
-        when(userRepository.findById(1L)).thenReturn(Optional.of(existingUser));
-        when(self.findByUsername("newuser")).thenReturn(Optional.empty());
-        when(self.findByEmail("new@example.com")).thenReturn(Optional.empty());
-        when(modelMapper.map(updatedDto, User.class)).thenReturn(updatedUser);
-        when(passwordEncoder.encode("newpassword")).thenReturn("encodedNewPass");
-        when(userRepository.save(existingUser)).thenReturn(existingUser);
-
-        User result = userService.updateUserById(1L, updatedDto);
-
-        assertEquals("newuser", result.getUsername());
-        assertEquals("encodedNewPass", result.getPassword());
-        assertNotNull(result.getUpdatedAt());
-        verify(userRepository).save(existingUser);
+                () -> userService.updateUser(updateUserDTO, token));
+        assertEquals("Email already taken", exception.getMessage());
     }
 
     @Test
     @Transactional
     void assignOwnerRole_ValidUser_AddsOwnerRole() {
         // Given
-        User user = new User();
-        user.setId(1L);
-        user.setRoles(new ArrayList<>(List.of(guestRole)));
-
         when(userRepository.findById(1L)).thenReturn(Optional.of(user));
         when(roleService.getOwnerRole()).thenReturn(ownerRole);
         when(userRepository.save(user)).thenReturn(user);
+        when(modelMapper.map(user, UserDTO.class)).thenReturn(userDTO);
 
         // When
-        User result = userService.assignOwnerRole(1L);
+        UserDTO result = userService.assignOwnerRole(1L);
 
         // Then
-        assertEquals(2, result.getRoles().size());
-        assertTrue(result.getRoles().contains(ownerRole));
+        assertNotNull(result);
         verify(userRepository, times(1)).save(user);
     }
 
     @Test
-    void existsById_UserExists_ReturnsTrue() {
+    @Transactional
+    void assignOwnerRole_UserAlreadyHasRole_ThrowsException() {
         // Given
-        when(userRepository.existsById(1L)).thenReturn(true);
+        User userWithRole = new User();
+        userWithRole.setId(1L);
+        userWithRole.setRoles(new ArrayList<>(List.of(guestRole, ownerRole)));
 
-        // When
-        Boolean result = userService.existsById(1L);
+        when(userRepository.findById(1L)).thenReturn(Optional.of(userWithRole));
+        when(roleService.getOwnerRole()).thenReturn(ownerRole);
 
-        // Then
-        assertTrue(result);
-        verify(userRepository, times(1)).existsById(1L);
+        // When & Then
+        UserException exception = assertThrows(UserException.class, () -> userService.assignOwnerRole(1L));
+        assertEquals("User already has OWNER role", exception.getMessage());
+
+        verify(userRepository, never()).save(any());
     }
 
     @Test
     @Transactional
-    void deleteUserById_ValidId_DeletesUser() {
+    void deleteUserById_Owner_DeletesUser() {
         // Given
-        when(cacheManager.getCache(anyString())).thenReturn(cache);
-        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
-        doNothing().when(userRepository).delete(user);
+        when(jwtTokenUtils.getUserId(token)).thenReturn(1L);
+        when(userRepository.existsById(1L)).thenReturn(true);
+
+        doNothing().when(userRepository).deleteById(1L);
 
         // When
-        userService.deleteUserById(1L);
+        userService.deleteUserById(1L, token);
 
         // Then
-        verify(userRepository, times(1)).delete(user);
+        verify(userRepository, times(1)).deleteById(1L);
     }
 }

@@ -7,6 +7,7 @@ import lombok.*;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.HashSet;
 import java.util.Set;
 
 @Entity
@@ -15,7 +16,6 @@ import java.util.Set;
 @NoArgsConstructor
 @Setter
 @Getter
-@ToString
 public class Property {
 
     @Id
@@ -57,6 +57,10 @@ public class Property {
             inverseJoinColumns = @JoinColumn(name = "feature_id")
     )
     private Set<PropertyFeature> features;
+
+    @OneToMany(mappedBy = "property", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    private Set<Image> images = new HashSet<>();
+
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 

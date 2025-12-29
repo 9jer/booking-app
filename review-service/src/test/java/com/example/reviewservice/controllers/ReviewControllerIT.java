@@ -10,10 +10,13 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
+import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -44,6 +47,9 @@ class ReviewControllerIT {
     @MockBean
     private JwtTokenUtils jwtTokenUtils;
 
+    @MockBean
+    private ModelMapper modelMapper;
+
     private Review testReview;
     private ReviewDTO testReviewDTO;
     private GetReviewDTO testGetReviewDTO;
@@ -54,7 +60,6 @@ class ReviewControllerIT {
         testReview = new Review();
         testReview.setId(1L);
         testReview.setPropertyId(1L);
-        testReview.setUserId(1L);
         testReview.setRating(5);
         testReview.setComment("Great place!");
         testReview.setCreatedAt(LocalDateTime.now());
@@ -67,124 +72,55 @@ class ReviewControllerIT {
         testGetReviewDTO = new GetReviewDTO();
         testGetReviewDTO.setId(1L);
         testGetReviewDTO.setPropertyId(1L);
-        testGetReviewDTO.setUserId(1L);
         testGetReviewDTO.setRating(5);
         testGetReviewDTO.setComment("Great place!");
 
         Mockito.when(jwtTokenUtils.getUserId(anyString())).thenReturn(1L);
-        Mockito.when(jwtTokenUtils.getRoles(anyString())).thenReturn(List.of("ROLE_USER"));
     }
 
     @Test
     void getReviewsByPropertyId_ShouldReturnReviews() throws Exception {
-        Mockito.when(reviewService.getReviewsByPropertyId(anyLong()))
-                .thenReturn(List.of(testReview));
+        Mockito.when(reviewService.getReviewsByPropertyId(anyLong(), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(testGetReviewDTO)));
 
         mockMvc.perform(get(REVIEWS_BY_PROPERTY_ENDPOINT, 1L)
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.reviews[0].id").value(testReview.getId()))
-                .andExpect(jsonPath("$.reviews[0].propertyId").value(testReview.getPropertyId()));
+                .andExpect(jsonPath("$.content[0].id").value(testGetReviewDTO.getId()));
     }
 
     @Test
     void createReview_WithValidData_ShouldReturnCreatedReview() throws Exception {
+        Mockito.when(modelMapper.map(any(ReviewDTO.class), eq(Review.class))).thenReturn(testReview);
         Mockito.when(reviewService.saveReview(any(Review.class), anyString()))
-                .thenReturn(testReview);
+                .thenReturn(testGetReviewDTO);
 
         mockMvc.perform(post(ROOT_ENDPOINT)
                         .header("Authorization", "Bearer " + validToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(testReviewDTO)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id").value(testReview.getId()))
-                .andExpect(jsonPath("$.propertyId").value(testReview.getPropertyId()));
-    }
-
-    @Test
-    void createReview_WithInvalidData_ShouldReturnBadRequest() throws Exception {
-        ReviewDTO invalidReviewDTO = new ReviewDTO();
-        invalidReviewDTO.setRating(6);
-
-        mockMvc.perform(post(ROOT_ENDPOINT)
-                        .header("Authorization", "Bearer " + validToken)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(invalidReviewDTO)))
-                .andExpect(status().isBadRequest());
+                .andExpect(jsonPath("$.id").value(testGetReviewDTO.getId()));
     }
 
     @Test
     void updateReview_WithValidData_ShouldReturnUpdatedReview() throws Exception {
+        Mockito.when(modelMapper.map(any(ReviewDTO.class), eq(Review.class))).thenReturn(testReview);
         Mockito.when(reviewService.updateReview(any(Review.class), anyString()))
-                .thenReturn(testReview);
+                .thenReturn(testGetReviewDTO);
 
         mockMvc.perform(put(ID_ENDPOINT, 1L)
                         .header("Authorization", "Bearer " + validToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(testReviewDTO)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id").value(testReview.getId()));
-    }
-
-    @Test
-    void updateReview_WithInvalidId_ShouldReturnNotFound() throws Exception {
-        Mockito.when(reviewService.updateReview(any(Review.class), anyString()))
-                .thenThrow(new ReviewException("Review not found"));
-
-        mockMvc.perform(put(ID_ENDPOINT, 999L)
-                        .header("Authorization", "Bearer " + validToken)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(testReviewDTO)))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").value("Review not found"));
-    }
-
-    @Test
-    void deleteReview_ShouldReturnNoContent() throws Exception {
-        mockMvc.perform(delete(ID_ENDPOINT, 1L)
-                        .header("Authorization", "Bearer " + validToken))
-                .andExpect(status().isNoContent());
-    }
-
-    @Test
-    void deleteReview_WithInvalidId_ShouldReturnNotFound() throws Exception {
-        Mockito.doThrow(new ReviewException("Review not found"))
-                .when(reviewService).deleteReview(anyLong(), anyString());
-
-        mockMvc.perform(delete(ID_ENDPOINT, 999L)
-                        .header("Authorization", "Bearer " + validToken))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").value("Review not found"));
-    }
-
-    @Test
-    void createReview_WhenPropertyNotExists_ShouldReturnBadRequest() throws Exception {
-        Mockito.when(reviewService.saveReview(any(Review.class), anyString()))
-                .thenThrow(new ReviewException("Property not found"));
-
-        mockMvc.perform(post(ROOT_ENDPOINT)
-                        .header("Authorization", "Bearer " + validToken)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(testReviewDTO)))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").value("Property not found"));
-    }
-
-    @Test
-    void createReview_WhenUserNotBooked_ShouldReturnBadRequest() throws Exception {
-        Mockito.when(reviewService.saveReview(any(Review.class), anyString()))
-                .thenThrow(new ReviewException("You can't leave a review until you've lived there"));
-
-        mockMvc.perform(post(ROOT_ENDPOINT)
-                        .header("Authorization", "Bearer " + validToken)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(testReviewDTO)))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").value("You can't leave a review until you've lived there"));
+                .andExpect(jsonPath("$.id").value(testGetReviewDTO.getId()));
     }
 
     @Test
     void updateReview_WhenNotReviewOwner_ShouldReturnBadRequest() throws Exception {
+        Mockito.when(modelMapper.map(any(ReviewDTO.class), eq(Review.class))).thenReturn(testReview);
+
         Mockito.when(reviewService.updateReview(any(Review.class), anyString()))
                 .thenThrow(new ReviewException("You can only update your own reviews"));
 

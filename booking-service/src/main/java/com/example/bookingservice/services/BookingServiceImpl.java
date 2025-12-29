@@ -2,6 +2,7 @@ package com.example.bookingservice.services;
 
 import com.example.bookingservice.client.PropertyClient;
 import com.example.bookingservice.client.UserClient;
+import com.example.bookingservice.dto.*;
 import com.example.bookingservice.event.BookingCreatedEvent;
 import com.example.bookingservice.event.BookingCreatedEventProducer;
 import com.example.bookingservice.models.Booking;
@@ -11,20 +12,34 @@ import com.example.bookingservice.repositories.BookingHistoryRepository;
 import com.example.bookingservice.repositories.BookingRepository;
 import com.example.bookingservice.util.BookingException;
 import com.example.bookingservice.util.JwtTokenUtils;
-import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.modelmapper.ModelMapper;
 import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.CachePut;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.dao.CannotSerializeTransactionException;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.retry.annotation.Backoff;
+import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 @Transactional(readOnly = true)
-@RequiredArgsConstructor
+@Slf4j
 public class BookingServiceImpl implements BookingService {
     private final BookingRepository bookingRepository;
     private final BookingHistoryRepository bookingHistoryRepository;
@@ -32,145 +47,318 @@ public class BookingServiceImpl implements BookingService {
     private final UserClient userClient;
     private final JwtTokenUtils jwtTokenUtils;
     private final BookingCreatedEventProducer producer;
+    private final ModelMapper modelMapper;
+    private final TransactionTemplate transactionTemplate;
 
-    @Override
-    public List<Booking> getAllBookings() {
-        return bookingRepository.findAll();
+    private static final int MAX_BOOKING_WINDOW_MONTHS = 3;
+
+    public BookingServiceImpl(BookingRepository bookingRepository,
+                              BookingHistoryRepository bookingHistoryRepository,
+                              PropertyClient propertyClient,
+                              UserClient userClient,
+                              JwtTokenUtils jwtTokenUtils,
+                              BookingCreatedEventProducer producer,
+                              ModelMapper modelMapper,
+                              PlatformTransactionManager transactionManager) {
+        this.bookingRepository = bookingRepository;
+        this.bookingHistoryRepository = bookingHistoryRepository;
+        this.propertyClient = propertyClient;
+        this.userClient = userClient;
+        this.jwtTokenUtils = jwtTokenUtils;
+        this.producer = producer;
+        this.modelMapper = modelMapper;
+        this.transactionTemplate = new TransactionTemplate(transactionManager);
     }
 
     @Override
-    public Booking getBookingById(Long bookingId) {
-        return bookingRepository.findById(bookingId)
-                .orElseThrow(()-> new BookingException("Booking not found"));
+    public Page<GetBookingDTO> getAllBookings(String token, Pageable pageable) {
+        List<String> roles = jwtTokenUtils.getRoles(token);
+        Page<Booking> bookings;
+
+        if (roles.contains("ROLE_ADMIN")) {
+            bookings = bookingRepository.findAll(pageable);
+        } else {
+            Long currentUserId = jwtTokenUtils.getUserId(token);
+            bookings = bookingRepository.findByUserId(currentUserId, pageable);
+        }
+
+        return bookings.map(this::convertToGetBookingDTO);
     }
 
     @Override
-    public List<Booking> getBookingByPropertyId(Long propertyId) {
-        return bookingRepository.findByPropertyId(propertyId);
+    @Cacheable(value = "bookingById", key = "#bookingId")
+    public GetBookingDTO getBookingById(Long bookingId, String token) {
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new BookingException("Booking not found"));
+
+        Long currentUserId = jwtTokenUtils.getUserId(token);
+        List<String> roles = jwtTokenUtils.getRoles(token);
+
+        if (!roles.contains("ROLE_ADMIN") && !booking.getUserId().equals(currentUserId)) {
+            GetPropertyDTO property = propertyClient.getPropertyById(booking.getPropertyId());
+            if (!property.getOwnerId().equals(currentUserId)) {
+                throw new BookingException("You do not have permission to view this booking.");
+            }
+        }
+
+        return convertToGetBookingDTO(booking);
     }
 
     @Override
-    public List<BookingHistory> getBookingHistoryByBookingId(Long bookingId) {
-        return bookingHistoryRepository.findByBookingId(bookingId);
+    public Page<GetBookingDTO> getBookingByPropertyId(Long propertyId, String token, Pageable pageable) {
+        List<String> roles = jwtTokenUtils.getRoles(token);
+        if (!roles.contains("ROLE_ADMIN")) {
+            Long currentUserId = jwtTokenUtils.getUserId(token);
+            GetPropertyDTO property = propertyClient.getPropertyById(propertyId);
+
+            if (property == null) {
+                throw new BookingException("Property not found");
+            }
+
+            if (!property.getOwnerId().equals(currentUserId)) {
+                throw new BookingException("You do not have permission to view bookings for this property.");
+            }
+        }
+
+        return bookingRepository.findByPropertyId(propertyId, pageable)
+                .map(this::convertToGetBookingDTO);
     }
 
     @Override
-    @Transactional
+    public List<BookingHistoryDTO> getBookingHistoryByBookingId(Long bookingId) {
+        return bookingHistoryRepository.findByBookingId(bookingId).stream()
+                .map(this::convertToBookingHistoryDTO)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public List<GetBookingDTO> getUserRecentBookings(String jwtToken) {
+        Long userId = jwtTokenUtils.getUserId(jwtToken);
+
+        List<Booking> recentBookings = bookingRepository.findTop5ByUserIdOrderByCreatedAtDesc(userId);
+
+        return recentBookings.stream()
+                .map(booking -> modelMapper.map(booking, GetBookingDTO.class))
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    @Retryable(
+            retryFor = { CannotSerializeTransactionException.class },
+            maxAttempts = 3,
+            backoff = @Backoff(delay = 100, multiplier = 2)
+    )
     @CacheEvict(value = "availableDates", key = "#booking.propertyId")
-    public Booking createBooking(Booking booking, String token) {
+    public GetBookingDTO createBooking(Booking booking, String token) {
+        booking.setId(null);
+
+        booking.setStatus(BookingStatus.PENDING);
+
+        validateBookingDates(booking.getCheckInDate(), booking.getCheckOutDate());
 
         Boolean propertyExists = propertyClient.propertyExists(booking.getPropertyId());
         if (propertyExists == null || !propertyExists) {
             throw new BookingException("Property with id " + booking.getPropertyId() + " not found.");
         }
 
-        booking.setUserId(jwtTokenUtils.getUserId(token));
+        Long userId = jwtTokenUtils.getUserId(token);
+        booking.setUserId(userId);
 
         Boolean userExists = userClient.userExists(booking.getUserId());
-
         if (userExists == null || !userExists) {
-            throw new BookingException("User with id " + booking.getUserId()
-                    + " not found.");
+            throw new BookingException("User with id " + booking.getUserId() + " not found.");
         }
 
-        if(!isAvailable(booking.getPropertyId(), booking.getCheckInDate(), booking.getCheckOutDate())){
-            throw new BookingException("Property is not available");
+        return transactionTemplate.execute(status -> {
+            if (!isAvailable(booking.getPropertyId(), booking.getCheckInDate(), booking.getCheckOutDate())) {
+                throw new BookingException("Property is not available for selected dates.");
+            }
+
+            booking.setCreatedAt(LocalDateTime.now());
+            Booking savedBooking = bookingRepository.save(booking);
+            saveHistory(savedBooking, booking.getStatus());
+
+            return convertToGetBookingDTO(savedBooking);
+        });
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    @CacheEvict(value = "availableDates", key = "#result.propertyId")
+    @CachePut(value = "bookingById", key = "#bookingId")
+    public GetBookingDTO updateBookingStatus(Long bookingId, BookingStatus bookingStatus, String token) {
+
+        Booking booking = transactionTemplate.execute(status ->
+                bookingRepository.findById(bookingId)
+                        .orElseThrow(() -> new BookingException("Booking not found"))
+        );
+
+        if (booking.getStatus() == bookingStatus) {
+            return convertToGetBookingDTO(booking);
         }
 
-        //booking.setStatus(BookingStatus.PENDING);
-        booking.setCreatedAt(LocalDateTime.now());
-        Booking savedBooking = bookingRepository.save(booking);
-        saveHistory(savedBooking, booking.getStatus());
+        List<String> roles = jwtTokenUtils.getRoles(token);
+        if (!roles.contains("ROLE_ADMIN")) {
+            Long currentUserId = jwtTokenUtils.getUserId(token);
+            GetPropertyDTO property = propertyClient.getPropertyById(booking.getPropertyId());
 
-        BookingCreatedEvent bookingCreatedEvent = new BookingCreatedEvent();
-        bookingCreatedEvent.setBookingId(booking.getId());
-        bookingCreatedEvent.setEmail(jwtTokenUtils.getEmail(token));
-        bookingCreatedEvent.setPropertyName(propertyClient.getPropertyById(booking
-                .getPropertyId()).getTitle());
-        bookingCreatedEvent.setCheckInDate(booking.getCheckInDate().toString());
-        bookingCreatedEvent.setCheckOutDate(booking.getCheckOutDate().toString());
+            if (!property.getOwnerId().equals(currentUserId)) {
+                throw new BookingException("You are not authorized to manage bookings for this property.");
+            }
+        }
 
-        producer.sendBookingCreatedEvent("booking-created", bookingCreatedEvent);
+        return transactionTemplate.execute(status -> {
+            Booking attachedBooking = bookingRepository.findById(bookingId).orElseThrow();
 
-        return savedBooking;
+            attachedBooking.setStatus(bookingStatus);
+            attachedBooking.setUpdatedAt(LocalDateTime.now());
+            saveHistory(attachedBooking, bookingStatus);
+
+            Booking updatedBooking = bookingRepository.save(attachedBooking);
+
+            if (updatedBooking.getStatus() == BookingStatus.CONFIRMED) {
+                executeAfterCommit(() -> {
+                    try {
+                        sendNotification(updatedBooking, token);
+                    } catch (Exception e) {
+                        log.error("Failed to send notification for booking " + updatedBooking.getId(), e);
+                    }
+                });
+            }
+            return convertToGetBookingDTO(updatedBooking);
+        });
     }
 
     @Override
     @Transactional
-    @CacheEvict(value = "availableDates", key = "#result.propertyId")
-    public Booking updateBookingStatus(Long bookingId, BookingStatus bookingStatus) {
-        Booking booking = getBookingById(bookingId);
-        booking.setStatus(bookingStatus);
+    public void initiatePayment(Long bookingId, String token) {
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new BookingException("Booking not found"));
+
+        Long currentUserId = jwtTokenUtils.getUserId(token);
+        if (!booking.getUserId().equals(currentUserId)) {
+            throw new BookingException("You can only pay for your own bookings");
+        }
+
+        if (booking.getStatus() != BookingStatus.PENDING) {
+            throw new BookingException("Booking cannot be paid (status is not PENDING)");
+        }
+
+        booking.setStatus(BookingStatus.AWAITING_PAYMENT);
         booking.setUpdatedAt(LocalDateTime.now());
-        saveHistory(booking, bookingStatus);
-        return bookingRepository.save(booking);
+
+        bookingRepository.save(booking);
+        saveHistory(booking, BookingStatus.AWAITING_PAYMENT);
+    }
+
+    @Override
+    @Transactional
+    public void completePayment(Long bookingId) {
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new BookingException("Booking not found"));
+
+        if (booking.getStatus() != BookingStatus.AWAITING_PAYMENT) {
+            return;
+        }
+
+        booking.setStatus(BookingStatus.CONFIRMED);
+        booking.setUpdatedAt(LocalDateTime.now());
+
+        saveHistory(booking, BookingStatus.CONFIRMED);
+
+        Booking savedBooking = bookingRepository.save(booking);
+
+        executeAfterCommit(() -> {
+            try {
+                sendNotificationWithoutToken(savedBooking);
+            } catch (Exception e) {
+                log.error("Failed to send notification for booking " + savedBooking.getId(), e);
+            }
+        });
     }
 
     @Override
     public Boolean isAvailable(Long propertyId, LocalDate checkIn, LocalDate checkOut) {
-        if (checkIn.isAfter(checkOut) || checkIn.isEqual(checkOut)) {
-            throw new BookingException("Check-in date must be before check-out date.");
-        }
-
-        Boolean propertyExists = propertyClient.propertyExists(propertyId);
-        if (propertyExists == null || !propertyExists) {
-            throw new BookingException("Property with id " + propertyId + " not found.");
-        }
-
+        validateBookingDates(checkIn, checkOut);
         return bookingRepository.countOverlappingBookings(propertyId, checkIn, checkOut) == 0;
     }
 
     @Override
-    public Boolean whetherThereWasABooking(Long propertyId, Long userId){
-        return !(bookingRepository.findConfirmedBookingByPropertyIdAndUserId(propertyId, userId).isEmpty());
+    public Boolean whetherThereWasABooking(Long propertyId, Long userId) {
+        return !bookingRepository.findConfirmedBookingByPropertyIdAndUserId(propertyId, userId).isEmpty();
     }
 
     @Override
     @Cacheable(value = "availableDates", key = "#propertyId")
-    public List<LocalDate> getAvailableDates(Long propertyId) {
-        Boolean propertyExists = propertyClient.propertyExists(propertyId);
-        if (propertyExists == null || !propertyExists) {
-            throw new BookingException("Property with id " + propertyId + " not found.");
-        }
-
-        List<Booking> bookings = bookingRepository.findBookingsByPropertyOrdered(propertyId);
+        public List<LocalDate> getAvailableDates(Long propertyId) {
+        List<Booking> bookings = bookingRepository.findFutureBookings(propertyId, LocalDate.now());
 
         List<LocalDate> availableDates = new ArrayList<>();
         LocalDate today = LocalDate.now();
-        LocalDate maxDate = today.plusMonths(3);
+        LocalDate maxDate = today.plusMonths(MAX_BOOKING_WINDOW_MONTHS);
 
         if (bookings.isEmpty()) {
-            for (LocalDate date = today; date.isBefore(maxDate); date = date.plusDays(1)) {
-                availableDates.add(date);
+            LocalDate currentDate = today;
+            while (currentDate.isBefore(maxDate)) {
+                availableDates.add(currentDate);
+                currentDate = currentDate.plusDays(1);
             }
             return availableDates;
         }
 
-        if (bookings.get(0).getCheckInDate().isAfter(today)) {
-            LocalDate start = today;
-            LocalDate end = bookings.get(0).getCheckInDate().minusDays(1);
-            while (!start.isAfter(end)) {
-                availableDates.add(start);
-                start = start.plusDays(1);
-            }
+        LocalDate currentDate = today;
+        LocalDate firstBookingCheckIn = bookings.get(0).getCheckInDate();
+
+        while (currentDate.isBefore(firstBookingCheckIn) && currentDate.isBefore(maxDate)) {
+            availableDates.add(currentDate);
+            currentDate = currentDate.plusDays(1);
         }
 
         for (int i = 0; i < bookings.size() - 1; i++) {
-            LocalDate endOfCurrent = bookings.get(i).getCheckOutDate().plusDays(1);
-            LocalDate startOfNext = bookings.get(i + 1).getCheckInDate().minusDays(1);
-            while (!endOfCurrent.isAfter(startOfNext)) {
-                availableDates.add(endOfCurrent);
-                endOfCurrent = endOfCurrent.plusDays(1);
+            LocalDate currentBookingCheckOut = bookings.get(i).getCheckOutDate();
+            LocalDate nextBookingCheckIn = bookings.get(i + 1).getCheckInDate();
+
+            if (currentBookingCheckOut.isAfter(maxDate)) break;
+
+            LocalDate date = currentBookingCheckOut;
+            while (date.isBefore(nextBookingCheckIn) && date.isBefore(maxDate)) {
+                availableDates.add(date);
+                date = date.plusDays(1);
             }
         }
 
-        LocalDate lastBookingEnd = bookings.get(bookings.size() - 1).getCheckOutDate().plusDays(1);
-        while (!lastBookingEnd.isAfter(maxDate)) {
-            availableDates.add(lastBookingEnd);
-            lastBookingEnd = lastBookingEnd.plusDays(1);
+        LocalDate lastBookingCheckOut = bookings.get(bookings.size() - 1).getCheckOutDate();
+        while (lastBookingCheckOut.isBefore(maxDate)) {
+            availableDates.add(lastBookingCheckOut);
+            lastBookingCheckOut = lastBookingCheckOut.plusDays(1);
         }
 
         return availableDates;
+    }
+
+    @Override
+    @Transactional
+    public void cancelBooking(Long bookingId, String token) {
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new BookingException("Booking not found"));
+
+        Long currentUserId = jwtTokenUtils.getUserId(token);
+        List<String> roles = jwtTokenUtils.getRoles(token);
+
+        if (!roles.contains("ROLE_ADMIN") && !booking.getUserId().equals(currentUserId)) {
+            throw new BookingException("You are not authorized to cancel this booking.");
+        }
+
+        if (booking.getStatus() == BookingStatus.CANCELLED) {
+            throw new BookingException("Booking is already cancelled.");
+        }
+
+        booking.setStatus(BookingStatus.CANCELLED);
+        booking.setUpdatedAt(LocalDateTime.now());
+
+        saveHistory(booking, BookingStatus.CANCELLED);
+        bookingRepository.save(booking);
     }
 
     private void saveHistory(Booking booking, BookingStatus bookingStatus) {
@@ -179,5 +367,104 @@ public class BookingServiceImpl implements BookingService {
         bookingHistory.setChangedAt(LocalDateTime.now());
         bookingHistory.setStatus(bookingStatus.name());
         bookingHistoryRepository.save(bookingHistory);
+    }
+
+    private void validateBookingDates(LocalDate checkIn, LocalDate checkOut) {
+        if (checkIn.isAfter(checkOut) || checkIn.isEqual(checkOut)) {
+            throw new BookingException("Check-in date must be before check-out date.");
+        }
+        if (checkIn.isBefore(LocalDate.now())) {
+            throw new BookingException("Cannot book dates in the past.");
+        }
+        if (checkOut.isAfter(LocalDate.now().plusMonths(MAX_BOOKING_WINDOW_MONTHS))) {
+            throw new BookingException("Cannot book more than " + MAX_BOOKING_WINDOW_MONTHS + " months in advance.");
+        }
+    }
+
+    private void sendNotification(Booking booking, String token) {
+        BookingCreatedEvent bookingCreatedEvent = new BookingCreatedEvent();
+        bookingCreatedEvent.setBookingId(booking.getId());
+        bookingCreatedEvent.setEmail(jwtTokenUtils.getEmail(token));
+
+        try {
+            String propertyTitle = propertyClient.getPropertyById(booking.getPropertyId()).getTitle();
+            bookingCreatedEvent.setPropertyName(propertyTitle);
+        } catch (Exception e) {
+            bookingCreatedEvent.setPropertyName("Unknown Property");
+        }
+
+        bookingCreatedEvent.setCheckInDate(booking.getCheckInDate().toString());
+        bookingCreatedEvent.setCheckOutDate(booking.getCheckOutDate().toString());
+
+        producer.sendBookingCreatedEvent("booking-created", bookingCreatedEvent);
+    }
+
+    private void sendNotificationWithoutToken(Booking booking) {
+        BookingCreatedEvent bookingCreatedEvent = new BookingCreatedEvent();
+        bookingCreatedEvent.setBookingId(booking.getId());
+
+        try {
+             UserDTO user = userClient.getUserById(booking.getUserId());
+             bookingCreatedEvent.setEmail(user.getEmail());
+        } catch (Exception e) {
+            log.error("Could not fetch user email", e);
+            return;
+        }
+
+        try {
+            String propertyTitle = propertyClient.getPropertyById(booking.getPropertyId()).getTitle();
+            bookingCreatedEvent.setPropertyName(propertyTitle);
+        } catch (Exception e) {
+            bookingCreatedEvent.setPropertyName("Unknown Property");
+        }
+
+        bookingCreatedEvent.setCheckInDate(booking.getCheckInDate().toString());
+        bookingCreatedEvent.setCheckOutDate(booking.getCheckOutDate().toString());
+
+        producer.sendBookingCreatedEvent("booking-created", bookingCreatedEvent);
+    }
+
+    protected void executeAfterCommit(Runnable runnable) {
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                runnable.run();
+            }
+        });
+    }
+
+    private GetBookingDTO convertToGetBookingDTO(Booking booking) {
+        GetBookingDTO dto = modelMapper.map(booking, GetBookingDTO.class);
+
+        try {
+            GetPropertyDTO propertyDTO = propertyClient.getPropertyById(booking.getPropertyId());
+            dto.setProperty(propertyDTO);
+
+            if (propertyDTO != null && propertyDTO.getPricePerNight() != null) {
+                long days = java.time.temporal.ChronoUnit.DAYS.between(
+                        booking.getCheckInDate(),
+                        booking.getCheckOutDate()
+                );
+                if (days < 1) days = 1;
+
+                BigDecimal total = propertyDTO.getPricePerNight()
+                        .multiply(BigDecimal.valueOf(days));
+                dto.setTotalPrice(total);
+            }
+        } catch (Exception e) {
+            log.error("Failed to fetch property details for booking " + booking.getId(), e);
+        }
+
+        return dto;
+    }
+
+    private BookingHistoryDTO convertToBookingHistoryDTO(BookingHistory bookingHistory) {
+        BookingHistoryDTO dto = modelMapper.map(bookingHistory, BookingHistoryDTO.class);
+
+        if (bookingHistory.getBooking() != null) {
+            dto.setBookingId(bookingHistory.getBooking().getId());
+        }
+
+        return dto;
     }
 }

@@ -7,11 +7,16 @@ import jakarta.validation.constraints.NotNull;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.io.Serial;
+import java.io.Serializable;
 import java.time.LocalDateTime;
 
 @Getter
 @Setter
-public class GetReviewDTO {
+public class GetReviewDTO implements Serializable {
+
+    @Serial
+    private static final long serialVersionUID = 1L;
 
     private Long id;
 
@@ -20,6 +25,9 @@ public class GetReviewDTO {
 
     @NotNull(message = "User id should not be empty!")
     private Long userId;
+
+    @NotNull(message = "Username should not be empty!")
+    private String username;
 
     @NotNull(message = "Rating should not be empty!")
     @Min(value = 1, message = "Rating should be greater than 1 and less than 5")

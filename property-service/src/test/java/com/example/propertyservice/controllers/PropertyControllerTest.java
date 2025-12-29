@@ -11,6 +11,9 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.modelmapper.ModelMapper;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -44,6 +47,7 @@ class PropertyControllerTest {
     private Property property;
     private PropertyDTO propertyDTO;
     private GetPropertyDTO getPropertyDTO;
+    private String authHeader = "Bearer token";
 
     @BeforeEach
     void setUp() {
@@ -76,11 +80,9 @@ class PropertyControllerTest {
     @Test
     void createProperty_ValidRequest_ReturnsGetPropertyDTO() {
         // Given
-        String authHeader = "Bearer token";
         when(bindingResult.hasErrors()).thenReturn(false);
         when(modelMapper.map(any(PropertyDTO.class), eq(Property.class))).thenReturn(property);
-        when(propertyService.save(any(Property.class), anyString())).thenReturn(property);
-        when(modelMapper.map(property, GetPropertyDTO.class)).thenReturn(getPropertyDTO);
+        when(propertyService.save(any(Property.class), anyString())).thenReturn(getPropertyDTO);
 
         // When
         ResponseEntity<GetPropertyDTO> response = propertyController.createProperty(authHeader, propertyDTO, bindingResult);
@@ -93,13 +95,11 @@ class PropertyControllerTest {
 
         verify(propertyService, times(1)).save(any(Property.class), anyString());
         verify(modelMapper, times(1)).map(any(PropertyDTO.class), eq(Property.class));
-        verify(modelMapper, times(1)).map(property, GetPropertyDTO.class);
     }
 
     @Test
     void createProperty_InvalidRequest_ThrowsPropertyException() {
         // Given
-        String authHeader = "Bearer token";
         when(bindingResult.hasErrors()).thenReturn(true);
 
         // When & Then
@@ -113,18 +113,15 @@ class PropertyControllerTest {
     @Test
     void updateProperty_ValidRequest_ReturnsUpdatedGetPropertyDTO() {
         // Given
-        String authHeader = "Bearer token";
         when(bindingResult.hasErrors()).thenReturn(false);
         when(modelMapper.map(any(PropertyDTO.class), eq(Property.class))).thenReturn(property);
-        when(propertyService.updatePropertyById(anyLong(), any(Property.class), anyString())).thenReturn(property);
-        when(modelMapper.map(property, GetPropertyDTO.class)).thenReturn(getPropertyDTO);
+        when(propertyService.updatePropertyById(anyLong(), any(Property.class), anyString())).thenReturn(getPropertyDTO);
 
         // When
         ResponseEntity<GetPropertyDTO> response = propertyController.updateProperty(authHeader, 1L, propertyDTO, bindingResult);
 
         // Then
         assertEquals(HttpStatus.OK, response.getStatusCode());
-        assertEquals(MediaType.APPLICATION_JSON, response.getHeaders().getContentType());
         assertNotNull(response.getBody());
         assertEquals(getPropertyDTO, response.getBody());
 
@@ -135,53 +132,48 @@ class PropertyControllerTest {
     @Test
     void deleteProperty_ValidId_ReturnsOkStatus() {
         // Given
-        doNothing().when(propertyService).delete(anyLong());
+        doNothing().when(propertyService).delete(anyLong(), anyString());
 
         // When
-        ResponseEntity<HttpStatus> response = propertyController.deleteProperty(1L);
+        ResponseEntity<HttpStatus> response = propertyController.deleteProperty(1L, authHeader);
 
         // Then
         assertEquals(HttpStatus.OK, response.getStatusCode());
-        verify(propertyService, times(1)).delete(1L);
+        verify(propertyService, times(1)).delete(1L, "token");
     }
 
     @Test
     void getAllProperties_ReturnsPropertiesResponse() {
         // Given
-        when(propertyService.findAll()).thenReturn(Collections.singletonList(property));
-        when(modelMapper.map(any(Property.class), eq(GetPropertyDTO.class))).thenReturn(getPropertyDTO);
+        when(propertyService.findAll(any(Pageable.class)))
+                .thenReturn(new PageImpl<>(Collections.singletonList(getPropertyDTO)));
 
         // When
-        ResponseEntity<PropertiesResponse> response = propertyController.getAllProperties();
+        ResponseEntity<Page<GetPropertyDTO>> response = propertyController.getAllProperties(Pageable.unpaged());
 
         // Then
         assertEquals(HttpStatus.OK, response.getStatusCode());
-        assertEquals(MediaType.APPLICATION_JSON, response.getHeaders().getContentType());
         assertNotNull(response.getBody());
-        assertEquals(1, response.getBody().getProperties().size());
-        assertEquals(getPropertyDTO, response.getBody().getProperties().get(0));
+        assertEquals(1, response.getBody().getTotalElements());
+        assertEquals(getPropertyDTO, response.getBody().getContent().get(0));
 
-        verify(propertyService, times(1)).findAll();
-        verify(modelMapper, times(1)).map(any(Property.class), eq(GetPropertyDTO.class));
+        verify(propertyService, times(1)).findAll(any(Pageable.class));
     }
 
     @Test
     void getPropertyById_PropertyExists_ReturnsGetPropertyDTO() {
         // Given
-        when(propertyService.getPropertyById(1L)).thenReturn(property);
-        when(modelMapper.map(any(Property.class), eq(GetPropertyDTO.class))).thenReturn(getPropertyDTO);
+        when(propertyService.getPropertyById(1L)).thenReturn(getPropertyDTO);
 
         // When
         ResponseEntity<GetPropertyDTO> response = propertyController.getPropertyById(1L);
 
         // Then
         assertEquals(HttpStatus.OK, response.getStatusCode());
-        assertEquals(MediaType.APPLICATION_JSON, response.getHeaders().getContentType());
         assertNotNull(response.getBody());
         assertEquals(getPropertyDTO, response.getBody());
 
         verify(propertyService, times(1)).getPropertyById(1L);
-        verify(modelMapper, times(1)).map(any(Property.class), eq(GetPropertyDTO.class));
     }
 
     @Test
@@ -190,20 +182,19 @@ class PropertyControllerTest {
         String location = "Test";
         BigDecimal minPrice = BigDecimal.valueOf(50);
         BigDecimal maxPrice = BigDecimal.valueOf(150);
-        when(propertyService.search(location, minPrice, maxPrice)).thenReturn(Collections.singletonList(property));
-        when(modelMapper.map(any(Property.class), eq(GetPropertyDTO.class))).thenReturn(getPropertyDTO);
+        when(propertyService.search(eq(location), eq(minPrice), eq(maxPrice), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(Collections.singletonList(getPropertyDTO)));
 
         // When
-        ResponseEntity<PropertiesResponse> response = propertyController.searchProperties(location, minPrice, maxPrice);
+        ResponseEntity<Page<GetPropertyDTO>> response = propertyController.searchProperties(location, minPrice, maxPrice, Pageable.unpaged());
 
         // Then
         assertEquals(HttpStatus.OK, response.getStatusCode());
-        assertEquals(MediaType.APPLICATION_JSON, response.getHeaders().getContentType());
         assertNotNull(response.getBody());
-        assertEquals(1, response.getBody().getProperties().size());
-        assertEquals(getPropertyDTO, response.getBody().getProperties().get(0));
+        assertEquals(1, response.getBody().getTotalElements());
+        assertEquals(getPropertyDTO, response.getBody().getContent().get(0));
 
-        verify(propertyService, times(1)).search(location, minPrice, maxPrice);
+        verify(propertyService, times(1)).search(eq(location), eq(minPrice), eq(maxPrice), any(Pageable.class));
     }
 
     @Test
@@ -236,9 +227,7 @@ class PropertyControllerTest {
 
         // Then
         assertEquals(HttpStatus.OK, response.getStatusCode());
-        assertEquals(MediaType.APPLICATION_JSON, response.getHeaders().getContentType());
         assertNotNull(response.getBody());
-        assertEquals(2, response.getBody().getAvailableDates().size());
         assertEquals(dates, response.getBody().getAvailableDates());
 
         verify(propertyService, times(1)).getAvailableDates(propertyId);
