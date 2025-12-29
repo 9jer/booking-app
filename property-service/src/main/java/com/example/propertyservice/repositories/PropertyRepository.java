@@ -24,7 +24,7 @@ public interface PropertyRepository extends JpaRepository<Property, Long> {
     Optional<Property> findById(Long id);
 
     @Query("SELECT p FROM Property p WHERE " +
-            "(:location IS NULL OR LOWER(p.location) LIKE LOWER(CONCAT('%', :location, '%'))) " +
+            "(:location IS NULL OR LOWER(p.location) LIKE :location) " +
             "AND (:minPrice IS NULL OR p.pricePerNight >= :minPrice) " +
             "AND (:maxPrice IS NULL OR p.pricePerNight <= :maxPrice)")
     Page<Property> searchProperties(@Param("location") String location,
@@ -35,4 +35,6 @@ public interface PropertyRepository extends JpaRepository<Property, Long> {
     @Modifying
     @Query("UPDATE Property p SET p.averageRating = :rating WHERE p.id = :id")
     void updateRating(@Param("id") Long id, @Param("rating") BigDecimal rating);
+
+    Page<Property> findByOwnerId(Long ownerId, Pageable pageable);
 }

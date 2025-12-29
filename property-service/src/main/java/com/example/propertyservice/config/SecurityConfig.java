@@ -20,13 +20,17 @@ public class SecurityConfig {
     private final CustomAccessDeniedHandler customAccessDeniedHandler;
     private final CustomAuthenticationEntryPoint customAuthenticationEntryPoint;
 
-
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
                 .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(auth -> auth
+                        .requestMatchers(HttpMethod.GET, "/api/v1/images/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/features/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/properties/my").hasAnyRole("OWNER", "ADMIN")
+                        .requestMatchers(HttpMethod.GET, "/api/v1/properties/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/properties").hasAnyRole("OWNER", "ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/api/v1/properties").hasAnyRole("OWNER", "ADMIN")
                         .requestMatchers(HttpMethod.PATCH, "/api/v1/properties/{id}").hasAnyRole("OWNER", "ADMIN")
                         .requestMatchers(HttpMethod.DELETE, "/api/v1/properties/{id}").hasAnyRole("OWNER", "ADMIN")
                         .requestMatchers("/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**").permitAll()

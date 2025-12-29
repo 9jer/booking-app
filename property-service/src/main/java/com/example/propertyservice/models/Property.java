@@ -7,8 +7,7 @@ import lombok.*;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.HashSet;
 import java.util.Set;
 
 @Entity
@@ -60,7 +59,7 @@ public class Property {
     private Set<PropertyFeature> features;
 
     @OneToMany(mappedBy = "property", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
-    private List<Image> images = new ArrayList<>();
+    private Set<Image> images = new HashSet<>();
 
     @Column(name = "created_at")
     private LocalDateTime createdAt;

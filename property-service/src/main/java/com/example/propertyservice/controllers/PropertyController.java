@@ -80,6 +80,17 @@ public class PropertyController {
                 .body(propertyService.findAll(pageable));
     }
 
+    @GetMapping("/my")
+    public ResponseEntity<Page<GetPropertyDTO>> getMyProperties(
+            @Parameter(hidden = true) @RequestHeader("Authorization") String authorizationHeader,
+            @PageableDefault(size = 10, sort = "id") Pageable pageable) {
+
+        String jwtToken = authorizationHeader.replace("Bearer ", "");
+        return ResponseEntity.ok()
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(propertyService.getMyProperties(jwtToken, pageable));
+    }
+
     @GetMapping(path = "${application.endpoint.id}")
     public ResponseEntity<GetPropertyDTO> getPropertyById(@PathVariable("id") Long id) {
         return ResponseEntity.ok()

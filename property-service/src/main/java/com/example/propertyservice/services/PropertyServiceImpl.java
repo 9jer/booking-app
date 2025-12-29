@@ -4,8 +4,10 @@ import com.example.propertyservice.client.BookingClient;
 import com.example.propertyservice.client.UserClient;
 import com.example.propertyservice.dto.GetPropertyDTO;
 import com.example.propertyservice.dto.PropertyFeatureDTO;
+import com.example.propertyservice.models.Favorite;
 import com.example.propertyservice.models.Property;
 import com.example.propertyservice.models.PropertyFeature;
+import com.example.propertyservice.repositories.FavoriteRepository;
 import com.example.propertyservice.repositories.PropertyFeatureRepository;
 import com.example.propertyservice.repositories.PropertyRepository;
 import com.example.propertyservice.util.JwtTokenUtils;
@@ -27,6 +29,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -35,6 +38,7 @@ import java.util.stream.Collectors;
 public class PropertyServiceImpl implements PropertyService {
     private final PropertyRepository propertyRepository;
     private final PropertyFeatureRepository propertyFeatureRepository;
+    private final FavoriteRepository favoriteRepository;
     private final BookingClient bookingClient;
     private final UserClient userClient;
     private final JwtTokenUtils jwtTokenUtils;
@@ -43,6 +47,7 @@ public class PropertyServiceImpl implements PropertyService {
 
     public PropertyServiceImpl(PropertyRepository propertyRepository,
                                PropertyFeatureRepository propertyFeatureRepository,
+                               FavoriteRepository favoriteRepository,
                                BookingClient bookingClient,
                                UserClient userClient,
                                JwtTokenUtils jwtTokenUtils,
@@ -50,6 +55,7 @@ public class PropertyServiceImpl implements PropertyService {
                                PlatformTransactionManager transactionManager) {
         this.propertyRepository = propertyRepository;
         this.propertyFeatureRepository = propertyFeatureRepository;
+        this.favoriteRepository = favoriteRepository;
         this.bookingClient = bookingClient;
         this.userClient = userClient;
         this.jwtTokenUtils = jwtTokenUtils;
@@ -61,6 +67,13 @@ public class PropertyServiceImpl implements PropertyService {
     public Page<GetPropertyDTO> findAll(Pageable pageable){
         return propertyRepository.findAll(pageable)
                 .map(this::convertToGetPropertyDTO);
+    }
+
+    @Override
+    public Page<GetPropertyDTO> getMyProperties(String token, Pageable pageable) {
+        Long ownerId = jwtTokenUtils.getUserId(token);
+        return propertyRepository.findByOwnerId(ownerId, pageable)
+                .map(property -> modelMapper.map(property, GetPropertyDTO.class));
     }
 
     @Override
@@ -159,7 +172,38 @@ public class PropertyServiceImpl implements PropertyService {
     }
 
     @Override
+    @Transactional
+    public void toggleFavorite(Long propertyId, String token) {
+        Long userId = jwtTokenUtils.getUserId(token);
+        Property property = propertyRepository.findById(propertyId)
+                .orElseThrow(() -> new PropertyException("Property not found"));
+
+        Optional<Favorite> existing = favoriteRepository.findByUserIdAndPropertyId(userId, propertyId);
+
+        if (existing.isPresent()) {
+            favoriteRepository.delete(existing.get());
+        } else {
+            Favorite favorite = new Favorite();
+            favorite.setUserId(userId);
+            favorite.setProperty(property);
+            favoriteRepository.save(favorite);
+        }
+    }
+
+    @Override
+    public Page<GetPropertyDTO> getUserFavorites(String token, Pageable pageable) {
+        Long userId = jwtTokenUtils.getUserId(token);
+        return favoriteRepository.findAllByUserId(userId, pageable)
+                .map(favorite -> convertToGetPropertyDTO(favorite.getProperty()));
+    }
+
+    @Override
     public Page<GetPropertyDTO> search(String location, BigDecimal minPrice, BigDecimal maxPrice, Pageable pageable) {
+        if (location != null && !location.isBlank()) {
+            location = "%" + location.toLowerCase() + "%";
+        } else {
+            location = null;
+        }
         return propertyRepository.searchProperties(location, minPrice, maxPrice, pageable)
                 .map(this::convertToGetPropertyDTO);
     }
@@ -219,6 +263,7 @@ public class PropertyServiceImpl implements PropertyService {
             Set<PropertyFeatureDTO> featureDTOs = property.getFeatures().stream()
                     .map(f -> {
                         PropertyFeatureDTO fdto = new PropertyFeatureDTO();
+                        fdto.setId(f.getId());
                         fdto.setName(f.getName());
                         return fdto;
                     })

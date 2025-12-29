@@ -14,6 +14,8 @@ public class PropertyFeatureDTO implements Serializable {
     @Serial
     private static final long serialVersionUID = 1L;
 
+    private Long id;
+
     @NotEmpty(message = "Feature name should not be empty!")
     private String name;
 }

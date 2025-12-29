@@ -36,4 +36,17 @@ CREATE TABLE Images (
 
 --changeset 9jer:insert-default-property-features
 INSERT INTO Property_Feature (name) VALUES
-                                        ('WiFi'), ('Pool'), ('Parking'), ('Air Conditioning'), ('Kitchen');
+                                ('Free Wi-Fi'),
+                                ('Parking'),
+                                ('Swimming Pool'),
+                                ('Air Conditioning'),
+                                ('Kitchen'),
+                                ('Pet Friendly');
+
+CREATE TABLE Favorites (
+                           id BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
+                           user_id BIGINT NOT NULL,
+                           property_id BIGINT NOT NULL,
+                           FOREIGN KEY (property_id) REFERENCES Properties(property_id) ON DELETE CASCADE,
+                           UNIQUE(user_id, property_id)
+);
