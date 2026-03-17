@@ -2,6 +2,7 @@ package com.example.propertyservice.controllers;
 
 import com.example.propertyservice.dto.GetPropertyDTO;
 import com.example.propertyservice.dto.PropertyDTO;
+import com.example.propertyservice.mapper.PropertyMapper;
 import com.example.propertyservice.models.Property;
 import com.example.propertyservice.services.PropertyService;
 import com.example.propertyservice.util.JwtTokenUtils;
@@ -10,7 +11,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
-import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -53,7 +53,7 @@ class PropertyControllerIT {
     private JwtTokenUtils jwtTokenUtils;
 
     @MockBean
-    private ModelMapper modelMapper;
+    private PropertyMapper propertyMapper;
 
     private Property testProperty;
     private PropertyDTO testPropertyDTO;
@@ -95,7 +95,7 @@ class PropertyControllerIT {
     void createProperty_WithValidData_ShouldReturnCreatedPropertyDTO() throws Exception {
         Mockito.when(propertyService.save(any(Property.class), anyString()))
                 .thenReturn(testGetPropertyDTO);
-        Mockito.when(modelMapper.map(any(PropertyDTO.class), eq(Property.class))).thenReturn(testProperty);
+        Mockito.when(propertyMapper.toProperty(any(PropertyDTO.class))).thenReturn(testProperty);
 
         mockMvc.perform(post(ROOT_ENDPOINT)
                         .header("Authorization", "Bearer " + validToken)
@@ -134,7 +134,7 @@ class PropertyControllerIT {
         Mockito.when(propertyService.updatePropertyById(anyLong(), any(Property.class), anyString()))
                 .thenReturn(testGetPropertyDTO);
 
-        Mockito.when(modelMapper.map(any(PropertyDTO.class), eq(Property.class))).thenReturn(testProperty);
+        Mockito.when(propertyMapper.toProperty(any(PropertyDTO.class))).thenReturn(testProperty);
 
         mockMvc.perform(patch(ID_ENDPOINT, 1L)
                         .header("Authorization", "Bearer " + validToken)

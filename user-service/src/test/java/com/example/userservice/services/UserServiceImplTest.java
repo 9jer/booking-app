@@ -2,6 +2,7 @@ package com.example.userservice.services;
 
 import com.example.userservice.dto.UpdateUserDTO;
 import com.example.userservice.dto.UserDTO;
+import com.example.userservice.mapper.UserMapper;
 import com.example.userservice.models.Role;
 import com.example.userservice.models.User;
 import com.example.userservice.repositories.UserRepository;
@@ -13,7 +14,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.modelmapper.ModelMapper;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -36,7 +36,7 @@ class UserServiceImplTest {
     private PasswordEncoder passwordEncoder;
 
     @Mock
-    private ModelMapper modelMapper;
+    private UserMapper userMapper;
 
     @Mock
     private JwtTokenUtils jwtTokenUtils;
@@ -97,7 +97,7 @@ class UserServiceImplTest {
             return saved;
         });
 
-        when(modelMapper.map(any(User.class), eq(UserDTO.class))).thenReturn(userDTO);
+        when(userMapper.toUserDTO(any(User.class))).thenReturn(userDTO);
 
         // When
         UserDTO result = userService.createNewUser(inputUser);
@@ -119,10 +119,10 @@ class UserServiceImplTest {
         when(userRepository.findByUsername(anyString())).thenReturn(Optional.empty());
         when(userRepository.findByEmail(anyString())).thenReturn(Optional.empty());
 
-        when(modelMapper.map(updateUserDTO, User.class)).thenReturn(updatedUserFromDTO);
+        when(userMapper.toUser(updateUserDTO)).thenReturn(updatedUserFromDTO);
 
         when(userRepository.save(user)).thenReturn(user);
-        when(modelMapper.map(user, UserDTO.class)).thenReturn(userDTO);
+        when(userMapper.toUserDTO(user)).thenReturn(userDTO);
 
         UserDTO result = userService.updateUser(updateUserDTO, token);
 
@@ -158,7 +158,7 @@ class UserServiceImplTest {
         when(userRepository.findById(1L)).thenReturn(Optional.of(user));
         when(roleService.getOwnerRole()).thenReturn(ownerRole);
         when(userRepository.save(user)).thenReturn(user);
-        when(modelMapper.map(user, UserDTO.class)).thenReturn(userDTO);
+        when(userMapper.toUserDTO(user)).thenReturn(userDTO);
 
         // When
         UserDTO result = userService.assignOwnerRole(1L);

@@ -8,6 +8,7 @@ import com.example.bookingservice.dto.GetPropertyDTO;
 import com.example.bookingservice.dto.UserDTO;
 import com.example.bookingservice.event.BookingCreatedEvent;
 import com.example.bookingservice.event.BookingCreatedEventProducer;
+import com.example.bookingservice.mapper.BookingMapper;
 import com.example.bookingservice.models.Booking;
 import com.example.bookingservice.models.BookingHistory;
 import com.example.bookingservice.models.BookingStatus;
@@ -22,7 +23,6 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.modelmapper.ModelMapper;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
@@ -64,7 +64,7 @@ class BookingServiceImplTest {
     private BookingCreatedEventProducer producer;
 
     @Mock
-    private ModelMapper modelMapper;
+    private BookingMapper bookingMapper;
 
     @Mock
     private PlatformTransactionManager transactionManager;
@@ -110,7 +110,7 @@ class BookingServiceImplTest {
         Pageable pageable = PageRequest.of(0, 10);
         when(jwtTokenUtils.getRoles(token)).thenReturn(List.of("ROLE_ADMIN"));
         when(bookingRepository.findAll(pageable)).thenReturn(new PageImpl<>(Collections.singletonList(booking)));
-        when(modelMapper.map(booking, GetBookingDTO.class)).thenReturn(getBookingDTO);
+        when(bookingMapper.toGetBookingDTO(booking)).thenReturn(getBookingDTO);
 
         // When
         Page<GetBookingDTO> result = bookingService.getAllBookings(token, pageable);
@@ -126,7 +126,7 @@ class BookingServiceImplTest {
         // Given
         when(bookingRepository.findById(1L)).thenReturn(Optional.of(booking));
         when(jwtTokenUtils.getUserId(token)).thenReturn(1L);
-        when(modelMapper.map(booking, GetBookingDTO.class)).thenReturn(getBookingDTO);
+        when(bookingMapper.toGetBookingDTO(booking)).thenReturn(getBookingDTO);
 
         // When
         GetBookingDTO result = bookingService.getBookingById(1L, token);
@@ -162,7 +162,7 @@ class BookingServiceImplTest {
         when(propertyClient.getPropertyById(1L)).thenReturn(propertyDTO);
 
         when(bookingRepository.findByPropertyId(1L, pageable)).thenReturn(new PageImpl<>(Collections.singletonList(booking)));
-        when(modelMapper.map(booking, GetBookingDTO.class)).thenReturn(getBookingDTO);
+        when(bookingMapper.toGetBookingDTO(booking)).thenReturn(getBookingDTO);
 
         // When
         Page<GetBookingDTO> result = bookingService.getBookingByPropertyId(1L, token, pageable);
@@ -177,7 +177,7 @@ class BookingServiceImplTest {
     void getBookingHistoryByBookingId_ReturnsListOfHistoryDTOs() {
         // Given
         when(bookingHistoryRepository.findByBookingId(1L)).thenReturn(Collections.singletonList(bookingHistory));
-        when(modelMapper.map(bookingHistory, BookingHistoryDTO.class)).thenReturn(bookingHistoryDTO);
+        when(bookingMapper.toBookingHistoryDTO(bookingHistory)).thenReturn(bookingHistoryDTO);
 
         // When
         List<BookingHistoryDTO> result = bookingService.getBookingHistoryByBookingId(1L);
@@ -207,7 +207,7 @@ class BookingServiceImplTest {
             return savedBooking;
         });
 
-        when(modelMapper.map(any(Booking.class), eq(GetBookingDTO.class))).thenReturn(getBookingDTO);
+        when(bookingMapper.toGetBookingDTO(any(Booking.class))).thenReturn(getBookingDTO);
 
         // When
         GetBookingDTO result = bookingService.createBooking(booking, token);
@@ -277,7 +277,7 @@ class BookingServiceImplTest {
         when(jwtTokenUtils.getRoles(token)).thenReturn(List.of("ROLE_ADMIN"));
         when(bookingRepository.save(any(Booking.class))).thenReturn(booking);
 
-        when(modelMapper.map(booking, GetBookingDTO.class)).thenReturn(getBookingDTO);
+        when(bookingMapper.toGetBookingDTO(booking)).thenReturn(getBookingDTO);
 
         // When
         GetBookingDTO result = bookingService.updateBookingStatus(1L, BookingStatus.CANCELLED, token);
@@ -487,7 +487,7 @@ class BookingServiceImplTest {
         when(jwtTokenUtils.getUserId(token)).thenReturn(1L);
         when(bookingRepository.findTop5ByUserIdOrderByCreatedAtDesc(1L))
                 .thenReturn(List.of(booking));
-        when(modelMapper.map(booking, GetBookingDTO.class)).thenReturn(getBookingDTO);
+        when(bookingMapper.toGetBookingDTO(booking)).thenReturn(getBookingDTO);
 
         // When
         List<GetBookingDTO> result = bookingService.getUserRecentBookings(token);

@@ -3,6 +3,7 @@ package com.example.reviewservice.services;
 import com.example.reviewservice.client.*;
 import com.example.reviewservice.dto.GetReviewDTO;
 import com.example.reviewservice.event.RatingEventProducer;
+import com.example.reviewservice.mapper.ReviewMapper;
 import com.example.reviewservice.models.Review;
 import com.example.reviewservice.repositories.ReviewRepository;
 import com.example.reviewservice.util.JwtTokenUtils;
@@ -14,7 +15,6 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.modelmapper.ModelMapper;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
@@ -53,7 +53,7 @@ class ReviewServiceImplTest {
     private RatingEventProducer ratingEventProducer;
 
     @Mock
-    private ModelMapper modelMapper;
+    private ReviewMapper reviewMapper;
 
     @Mock
     private PlatformTransactionManager transactionManager;
@@ -89,7 +89,7 @@ class ReviewServiceImplTest {
         Pageable pageable = PageRequest.of(0, 10);
         when(reviewRepository.findByPropertyId(eq(1L), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(review)));
-        when(modelMapper.map(review, GetReviewDTO.class)).thenReturn(getReviewDTO);
+        when(reviewMapper.toGetReviewDTO(review)).thenReturn(getReviewDTO);
 
         // When
         Page<GetReviewDTO> result = reviewService.getReviewsByPropertyId(1L, pageable);
@@ -119,7 +119,7 @@ class ReviewServiceImplTest {
         when(userClient.userExists(1L)).thenReturn(true);
         when(bookingClient.wasBooked(1L, 1L)).thenReturn(true);
         when(reviewRepository.save(any(Review.class))).thenReturn(review);
-        when(modelMapper.map(review, GetReviewDTO.class)).thenReturn(getReviewDTO);
+        when(reviewMapper.toGetReviewDTO(review)).thenReturn(getReviewDTO);
 
         // When
         GetReviewDTO result = reviewService.saveReview(newReview, validToken);
@@ -179,7 +179,7 @@ class ReviewServiceImplTest {
         when(reviewRepository.findById(1L)).thenReturn(Optional.of(existingReview));
         when(jwtTokenUtils.getUserId(validToken)).thenReturn(1L);
         when(reviewRepository.save(any(Review.class))).thenReturn(existingReview);
-        when(modelMapper.map(existingReview, GetReviewDTO.class)).thenReturn(getReviewDTO);
+        when(reviewMapper.toGetReviewDTO(existingReview)).thenReturn(getReviewDTO);
 
         // When
         GetReviewDTO result = reviewService.updateReview(updatedReviewInput, validToken);
@@ -203,7 +203,7 @@ class ReviewServiceImplTest {
         when(reviewRepository.findById(1L)).thenReturn(Optional.of(review));
         when(jwtTokenUtils.getUserId(validToken)).thenReturn(1L);
         doNothing().when(reviewRepository).delete(review);
-        when(modelMapper.map(review, GetReviewDTO.class)).thenReturn(getReviewDTO);
+        when(reviewMapper.toGetReviewDTO(review)).thenReturn(getReviewDTO);
 
         // When
         GetReviewDTO result = reviewService.deleteReview(1L, validToken);

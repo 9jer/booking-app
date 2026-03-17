@@ -1,6 +1,7 @@
 package com.example.bookingservice.controllers;
 
 import com.example.bookingservice.dto.*;
+import com.example.bookingservice.mapper.BookingMapper;
 import com.example.bookingservice.models.Booking;
 import com.example.bookingservice.models.BookingStatus;
 import com.example.bookingservice.services.BookingService;
@@ -10,7 +11,6 @@ import com.example.bookingservice.util.ErrorsUtil;
 import io.swagger.v3.oas.annotations.Parameter;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -32,7 +32,7 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class BookingController {
     private final BookingService bookingService;
-    private final ModelMapper modelMapper;
+    private final BookingMapper bookingMapper;
 
     @Value("${application.endpoint.root}")
     private String rootEndpointUri;
@@ -168,7 +168,7 @@ public class BookingController {
     }
 
     private Booking convertBookingDTOToBooking(BookingDTO bookingDTO){
-        return modelMapper.map(bookingDTO, Booking.class);
+        return bookingMapper.toBooking(bookingDTO);
     }
 
     @ExceptionHandler

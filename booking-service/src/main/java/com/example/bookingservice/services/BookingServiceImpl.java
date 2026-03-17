@@ -5,6 +5,7 @@ import com.example.bookingservice.client.UserClient;
 import com.example.bookingservice.dto.*;
 import com.example.bookingservice.event.BookingCreatedEvent;
 import com.example.bookingservice.event.BookingCreatedEventProducer;
+import com.example.bookingservice.mapper.BookingMapper;
 import com.example.bookingservice.models.Booking;
 import com.example.bookingservice.models.BookingHistory;
 import com.example.bookingservice.models.BookingStatus;
@@ -13,7 +14,6 @@ import com.example.bookingservice.repositories.BookingRepository;
 import com.example.bookingservice.util.BookingException;
 import com.example.bookingservice.util.JwtTokenUtils;
 import lombok.extern.slf4j.Slf4j;
-import org.modelmapper.ModelMapper;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.CachePut;
 import org.springframework.cache.annotation.Cacheable;
@@ -47,7 +47,7 @@ public class BookingServiceImpl implements BookingService {
     private final UserClient userClient;
     private final JwtTokenUtils jwtTokenUtils;
     private final BookingCreatedEventProducer producer;
-    private final ModelMapper modelMapper;
+    private final BookingMapper bookingMapper;
     private final TransactionTemplate transactionTemplate;
 
     private static final int MAX_BOOKING_WINDOW_MONTHS = 3;
@@ -58,7 +58,7 @@ public class BookingServiceImpl implements BookingService {
                               UserClient userClient,
                               JwtTokenUtils jwtTokenUtils,
                               BookingCreatedEventProducer producer,
-                              ModelMapper modelMapper,
+                              BookingMapper bookingMapper,
                               PlatformTransactionManager transactionManager) {
         this.bookingRepository = bookingRepository;
         this.bookingHistoryRepository = bookingHistoryRepository;
@@ -66,7 +66,7 @@ public class BookingServiceImpl implements BookingService {
         this.userClient = userClient;
         this.jwtTokenUtils = jwtTokenUtils;
         this.producer = producer;
-        this.modelMapper = modelMapper;
+        this.bookingMapper = bookingMapper;
         this.transactionTemplate = new TransactionTemplate(transactionManager);
     }
 
@@ -138,7 +138,7 @@ public class BookingServiceImpl implements BookingService {
         List<Booking> recentBookings = bookingRepository.findTop5ByUserIdOrderByCreatedAtDesc(userId);
 
         return recentBookings.stream()
-                .map(booking -> modelMapper.map(booking, GetBookingDTO.class))
+                .map(bookingMapper::toGetBookingDTO)
                 .collect(Collectors.toList());
     }
 
@@ -434,7 +434,7 @@ public class BookingServiceImpl implements BookingService {
     }
 
     private GetBookingDTO convertToGetBookingDTO(Booking booking) {
-        GetBookingDTO dto = modelMapper.map(booking, GetBookingDTO.class);
+        GetBookingDTO dto = bookingMapper.toGetBookingDTO(booking);
 
         try {
             GetPropertyDTO propertyDTO = propertyClient.getPropertyById(booking.getPropertyId());
@@ -459,7 +459,7 @@ public class BookingServiceImpl implements BookingService {
     }
 
     private BookingHistoryDTO convertToBookingHistoryDTO(BookingHistory bookingHistory) {
-        BookingHistoryDTO dto = modelMapper.map(bookingHistory, BookingHistoryDTO.class);
+        BookingHistoryDTO dto = bookingMapper.toBookingHistoryDTO(bookingHistory);
 
         if (bookingHistory.getBooking() != null) {
             dto.setBookingId(bookingHistory.getBooking().getId());

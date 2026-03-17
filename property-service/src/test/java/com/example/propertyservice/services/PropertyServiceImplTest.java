@@ -2,6 +2,7 @@ package com.example.propertyservice.services;
 
 import com.example.propertyservice.client.UserClient;
 import com.example.propertyservice.dto.GetPropertyDTO;
+import com.example.propertyservice.mapper.PropertyMapper;
 import com.example.propertyservice.models.Property;
 import com.example.propertyservice.models.PropertyFeature;
 import com.example.propertyservice.repositories.FavoriteRepository;
@@ -15,7 +16,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.modelmapper.ModelMapper;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
@@ -51,7 +51,7 @@ class PropertyServiceImplTest {
     private JwtTokenUtils jwtTokenUtils;
 
     @Mock
-    private ModelMapper modelMapper;
+    private PropertyMapper propertyMapper;
 
     @Mock
     private PlatformTransactionManager transactionManager;
@@ -92,7 +92,7 @@ class PropertyServiceImplTest {
         // Given
         Pageable pageable = PageRequest.of(0, 10);
         when(propertyRepository.findAll(pageable)).thenReturn(new PageImpl<>(List.of(property)));
-        when(modelMapper.map(property, GetPropertyDTO.class)).thenReturn(getPropertyDTO);
+        when(propertyMapper.toGetPropertyDTO(property)).thenReturn(getPropertyDTO);
 
         // When
         Page<GetPropertyDTO> result = propertyService.findAll(pageable);
@@ -107,7 +107,7 @@ class PropertyServiceImplTest {
     void getPropertyById_PropertyExists_ReturnsDTO() {
         // Given
         when(propertyRepository.findById(1L)).thenReturn(Optional.of(property));
-        when(modelMapper.map(property, GetPropertyDTO.class)).thenReturn(getPropertyDTO);
+        when(propertyMapper.toGetPropertyDTO(property)).thenReturn(getPropertyDTO);
 
         // When
         GetPropertyDTO result = propertyService.getPropertyById(1L);
@@ -143,7 +143,7 @@ class PropertyServiceImplTest {
         when(userClient.userExists(1L)).thenReturn(true);
         when(propertyRepository.save(any(Property.class))).thenReturn(property);
         when(propertyFeatureRepository.findByName(anyString())).thenReturn(Optional.of(feature));
-        when(modelMapper.map(property, GetPropertyDTO.class)).thenReturn(getPropertyDTO);
+        when(propertyMapper.toGetPropertyDTO(property)).thenReturn(getPropertyDTO);
 
         // When
         GetPropertyDTO result = propertyService.save(property, token);
@@ -175,7 +175,7 @@ class PropertyServiceImplTest {
         when(propertyRepository.save(any(Property.class))).thenReturn(existingProperty);
         when(propertyFeatureRepository.findByName(anyString())).thenReturn(Optional.of(feature));
 
-        when(modelMapper.map(existingProperty, GetPropertyDTO.class)).thenReturn(getPropertyDTO);
+        when(propertyMapper.toGetPropertyDTO(existingProperty)).thenReturn(getPropertyDTO);
 
         // When
         GetPropertyDTO result = propertyService.updatePropertyById(1L, updatedProperty, token);
@@ -204,7 +204,7 @@ class PropertyServiceImplTest {
                 eq(pageable)
         )).thenReturn(propertyPage);
 
-        when(modelMapper.map(any(Property.class), eq(GetPropertyDTO.class))).thenReturn(getPropertyDTO);
+        when(propertyMapper.toGetPropertyDTO(any(Property.class))).thenReturn(getPropertyDTO);
 
         // When
         Page<GetPropertyDTO> result = propertyService.search(location, minPrice, maxPrice, pageable);
@@ -226,7 +226,7 @@ class PropertyServiceImplTest {
     void updateAverageRating_UpdatesRatingAndReturnsDTO() {
         // Given
         when(propertyRepository.findById(1L)).thenReturn(Optional.of(property));
-        when(modelMapper.map(property, GetPropertyDTO.class)).thenReturn(getPropertyDTO);
+        when(propertyMapper.toGetPropertyDTO(property)).thenReturn(getPropertyDTO);
 
         // When
         GetPropertyDTO result = propertyService.updateAverageRating(1L, 4.5, 10L);
@@ -302,7 +302,7 @@ class PropertyServiceImplTest {
         Pageable pageable = PageRequest.of(0, 10);
         when(jwtTokenUtils.getUserId("token")).thenReturn(1L);
         when(propertyRepository.findByOwnerId(1L, pageable)).thenReturn(new PageImpl<>(List.of(property)));
-        when(modelMapper.map(property, GetPropertyDTO.class)).thenReturn(getPropertyDTO);
+        when(propertyMapper.toGetPropertyDTO(property)).thenReturn(getPropertyDTO);
 
         // When
         Page<GetPropertyDTO> result = propertyService.getMyProperties("token", pageable);

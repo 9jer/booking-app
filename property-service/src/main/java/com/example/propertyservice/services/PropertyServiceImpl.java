@@ -4,6 +4,7 @@ import com.example.propertyservice.client.BookingClient;
 import com.example.propertyservice.client.UserClient;
 import com.example.propertyservice.dto.GetPropertyDTO;
 import com.example.propertyservice.dto.PropertyFeatureDTO;
+import com.example.propertyservice.mapper.PropertyMapper;
 import com.example.propertyservice.models.Favorite;
 import com.example.propertyservice.models.Property;
 import com.example.propertyservice.models.PropertyFeature;
@@ -12,7 +13,6 @@ import com.example.propertyservice.repositories.PropertyFeatureRepository;
 import com.example.propertyservice.repositories.PropertyRepository;
 import com.example.propertyservice.util.JwtTokenUtils;
 import com.example.propertyservice.util.PropertyException;
-import org.modelmapper.ModelMapper;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.CachePut;
 import org.springframework.cache.annotation.Cacheable;
@@ -42,7 +42,7 @@ public class PropertyServiceImpl implements PropertyService {
     private final BookingClient bookingClient;
     private final UserClient userClient;
     private final JwtTokenUtils jwtTokenUtils;
-    private final ModelMapper modelMapper;
+    private final PropertyMapper propertyMapper;
     private final TransactionTemplate transactionTemplate;
 
     public PropertyServiceImpl(PropertyRepository propertyRepository,
@@ -51,7 +51,7 @@ public class PropertyServiceImpl implements PropertyService {
                                BookingClient bookingClient,
                                UserClient userClient,
                                JwtTokenUtils jwtTokenUtils,
-                               ModelMapper modelMapper,
+                               PropertyMapper propertyMapper,
                                PlatformTransactionManager transactionManager) {
         this.propertyRepository = propertyRepository;
         this.propertyFeatureRepository = propertyFeatureRepository;
@@ -59,7 +59,7 @@ public class PropertyServiceImpl implements PropertyService {
         this.bookingClient = bookingClient;
         this.userClient = userClient;
         this.jwtTokenUtils = jwtTokenUtils;
-        this.modelMapper = modelMapper;
+        this.propertyMapper = propertyMapper;
         this.transactionTemplate = new TransactionTemplate(transactionManager);
     }
 
@@ -73,7 +73,7 @@ public class PropertyServiceImpl implements PropertyService {
     public Page<GetPropertyDTO> getMyProperties(String token, Pageable pageable) {
         Long ownerId = jwtTokenUtils.getUserId(token);
         return propertyRepository.findByOwnerId(ownerId, pageable)
-                .map(property -> modelMapper.map(property, GetPropertyDTO.class));
+                .map(propertyMapper::toGetPropertyDTO);
     }
 
     @Override
@@ -257,7 +257,7 @@ public class PropertyServiceImpl implements PropertyService {
     }
 
     private GetPropertyDTO convertToGetPropertyDTO(Property property) {
-        GetPropertyDTO dto = modelMapper.map(property, GetPropertyDTO.class);
+        GetPropertyDTO dto = propertyMapper.toGetPropertyDTO(property);
 
         if (property.getFeatures() != null) {
             Set<PropertyFeatureDTO> featureDTOs = property.getFeatures().stream()

@@ -2,6 +2,7 @@ package com.example.reviewservice.controllers;
 
 import com.example.reviewservice.dto.GetReviewDTO;
 import com.example.reviewservice.dto.ReviewDTO;
+import com.example.reviewservice.mapper.ReviewMapper;
 import com.example.reviewservice.models.Review;
 import com.example.reviewservice.services.ReviewService;
 import org.junit.jupiter.api.BeforeEach;
@@ -10,7 +11,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.modelmapper.ModelMapper;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
@@ -32,7 +32,7 @@ class ReviewControllerTest {
     private ReviewService reviewService;
 
     @Mock
-    private ModelMapper modelMapper;
+    private ReviewMapper reviewMapper;
 
     @Mock
     private BindingResult bindingResult;
@@ -90,7 +90,7 @@ class ReviewControllerTest {
         // Given
         String authHeader = "Bearer token";
         when(bindingResult.hasErrors()).thenReturn(false);
-        when(modelMapper.map(any(ReviewDTO.class), eq(Review.class))).thenReturn(review);
+        when(reviewMapper.toReview(any(ReviewDTO.class))).thenReturn(review);
         when(reviewService.saveReview(any(Review.class), anyString())).thenReturn(getReviewDTO);
 
         // When
@@ -103,7 +103,7 @@ class ReviewControllerTest {
         assertEquals(getReviewDTO, response.getBody());
 
         verify(reviewService, times(1)).saveReview(any(Review.class), anyString());
-        verify(modelMapper, times(1)).map(any(ReviewDTO.class), eq(Review.class));
+        verify(reviewMapper, times(1)).toReview(any(ReviewDTO.class));
     }
 
     @Test
@@ -111,7 +111,7 @@ class ReviewControllerTest {
         // Given
         String authHeader = "Bearer token";
         when(bindingResult.hasErrors()).thenReturn(false);
-        when(modelMapper.map(any(ReviewDTO.class), eq(Review.class))).thenReturn(review);
+        when(reviewMapper.toReview(any(ReviewDTO.class))).thenReturn(review);
         when(reviewService.updateReview(any(Review.class), anyString())).thenReturn(getReviewDTO);
 
         // When
@@ -125,7 +125,7 @@ class ReviewControllerTest {
         assertEquals(1L, response.getBody().getId());
 
         verify(reviewService, times(1)).updateReview(any(Review.class), anyString());
-        verify(modelMapper, times(1)).map(any(ReviewDTO.class), eq(Review.class));
+        verify(reviewMapper, times(1)).toReview(any(ReviewDTO.class));
     }
 
     @Test

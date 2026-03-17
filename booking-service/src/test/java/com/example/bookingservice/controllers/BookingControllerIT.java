@@ -2,6 +2,7 @@ package com.example.bookingservice.controllers;
 
 import com.example.bookingservice.dto.BookingDTO;
 import com.example.bookingservice.dto.GetBookingDTO;
+import com.example.bookingservice.mapper.BookingMapper;
 import com.example.bookingservice.models.Booking;
 import com.example.bookingservice.models.BookingStatus;
 import com.example.bookingservice.services.BookingService;
@@ -10,7 +11,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
-import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -53,7 +53,7 @@ class BookingControllerIT {
     private JwtTokenUtils jwtTokenUtils;
 
     @MockBean
-    private ModelMapper modelMapper;
+    private BookingMapper bookingMapper;
 
     private Booking testBooking;
     private BookingDTO testBookingDTO;
@@ -127,7 +127,7 @@ class BookingControllerIT {
 
     @Test
     void createBooking_WithValidData_ShouldReturnCreatedBooking() throws Exception {
-        Mockito.when(modelMapper.map(any(BookingDTO.class), eq(Booking.class))).thenReturn(testBooking);
+        Mockito.when(bookingMapper.toBooking(any(BookingDTO.class))).thenReturn(testBooking);
         Mockito.when(bookingService.createBooking(any(Booking.class), anyString()))
                 .thenReturn(testGetBookingDTO);
 

@@ -4,6 +4,7 @@ import com.example.userservice.dto.JwtRequest;
 import com.example.userservice.dto.JwtResponse;
 import com.example.userservice.dto.SaveUserDTO;
 import com.example.userservice.dto.UserDTO;
+import com.example.userservice.mapper.UserMapper;
 import com.example.userservice.models.Role;
 import com.example.userservice.models.User;
 import com.example.userservice.security.CustomUserDetails;
@@ -12,7 +13,6 @@ import com.example.userservice.util.AuthException;
 import com.example.userservice.util.ErrorsUtil;
 import com.example.userservice.util.JwtTokenUtils;
 import lombok.RequiredArgsConstructor;
-import org.modelmapper.ModelMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -32,7 +32,7 @@ public class AuthServiceImpl implements AuthService {
     private final CustomUserDetailsService customUserDetailsService;
     private final JwtTokenUtils jwtTokenUtils;
     private final AuthenticationManager authenticationManager;
-    private final ModelMapper modelMapper;
+    private final UserMapper userMapper;
     private final Logger LOG = LoggerFactory.getLogger(AuthServiceImpl.class);
 
     @Override
@@ -74,6 +74,6 @@ public class AuthServiceImpl implements AuthService {
     }
 
     private User convertRegistrationUserDTOToUser(SaveUserDTO saveUserDTO) {
-        return modelMapper.map(saveUserDTO, User.class);
+        return userMapper.toUser(saveUserDTO);
     }
 }

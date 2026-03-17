@@ -6,12 +6,12 @@ import com.example.reviewservice.client.UserClient;
 import com.example.reviewservice.dto.GetReviewDTO;
 import com.example.reviewservice.dto.UserResponseDTO;
 import com.example.reviewservice.event.RatingEventProducer;
+import com.example.reviewservice.mapper.ReviewMapper;
 import com.example.reviewservice.models.Review;
 import com.example.reviewservice.repositories.ReviewRepository;
 import com.example.reviewservice.util.JwtTokenUtils;
 import com.example.reviewservice.util.ReviewException;
 import lombok.extern.slf4j.Slf4j;
-import org.modelmapper.ModelMapper;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -35,7 +35,7 @@ public class ReviewServiceImpl implements ReviewService {
     private final BookingClient bookingClient;
     private final JwtTokenUtils jwtTokenUtils;
     private final RatingEventProducer ratingEventProducer;
-    private final ModelMapper modelMapper;
+    private final ReviewMapper reviewMapper;
     private final TransactionTemplate transactionTemplate;
 
     public ReviewServiceImpl(ReviewRepository reviewRepository,
@@ -44,7 +44,7 @@ public class ReviewServiceImpl implements ReviewService {
                              BookingClient bookingClient,
                              JwtTokenUtils jwtTokenUtils,
                              RatingEventProducer ratingEventProducer,
-                             ModelMapper modelMapper,
+                             ReviewMapper reviewMapper,
                              PlatformTransactionManager transactionManager) {
         this.reviewRepository = reviewRepository;
         this.propertyClient = propertyClient;
@@ -52,7 +52,7 @@ public class ReviewServiceImpl implements ReviewService {
         this.bookingClient = bookingClient;
         this.jwtTokenUtils = jwtTokenUtils;
         this.ratingEventProducer = ratingEventProducer;
-        this.modelMapper = modelMapper;
+        this.reviewMapper = reviewMapper;
         this.transactionTemplate = new TransactionTemplate(transactionManager);
     }
 
@@ -182,7 +182,7 @@ public class ReviewServiceImpl implements ReviewService {
     }
 
     private GetReviewDTO convertToGetReviewDTO(Review review) {
-        GetReviewDTO dto = modelMapper.map(review, GetReviewDTO.class);
+        GetReviewDTO dto = reviewMapper.toGetReviewDTO(review);
         try {
             UserResponseDTO user = userClient.getUserById(review.getUserId());
             dto.setUsername(user.getUsername());

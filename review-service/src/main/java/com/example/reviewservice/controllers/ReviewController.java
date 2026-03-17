@@ -2,6 +2,7 @@ package com.example.reviewservice.controllers;
 
 import com.example.reviewservice.dto.GetReviewDTO;
 import com.example.reviewservice.dto.ReviewDTO;
+import com.example.reviewservice.mapper.ReviewMapper;
 import com.example.reviewservice.models.Review;
 import com.example.reviewservice.services.ReviewService;
 import com.example.reviewservice.util.ErrorsUtil;
@@ -10,7 +11,6 @@ import com.example.reviewservice.util.ReviewException;
 import io.swagger.v3.oas.annotations.Parameter;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.modelmapper.ModelMapper;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -25,7 +25,7 @@ import org.springframework.web.bind.annotation.*;
 @RequiredArgsConstructor
 public class ReviewController {
     private final ReviewService reviewService;
-    private final ModelMapper modelMapper;
+    private final ReviewMapper reviewMapper;
 
     @GetMapping(path = "${application.endpoint.reviews-by-property-id}")
     public ResponseEntity<Page<GetReviewDTO>> getReviewsByPropertyId(@PathVariable Long id,
@@ -78,7 +78,7 @@ public class ReviewController {
     }
 
     private Review convertReviewDTOToReview(ReviewDTO reviewDTO) {
-        return modelMapper.map(reviewDTO, Review.class);
+        return reviewMapper.toReview(reviewDTO);
     }
 
     @ExceptionHandler
