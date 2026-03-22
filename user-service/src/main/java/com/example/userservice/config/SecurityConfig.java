@@ -1,5 +1,7 @@
 package com.example.userservice.config;
 
+import com.example.common.security.ServletAccessDeniedHandler;
+import com.example.common.security.ServletAuthenticationEntryPoint;
 import com.example.userservice.security.CustomUserDetailsService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
@@ -27,8 +29,8 @@ import java.util.List;
 public class SecurityConfig {
     private final CustomUserDetailsService customUserDetailsService;
     private final JwtRequestFilter jwtRequestFilter;
-    private final CustomAccessDeniedHandler customAccessDeniedHandler;
-    private final CustomAuthenticationEntryPoint customAuthenticationEntryPoint;
+    private final ServletAccessDeniedHandler customAccessDeniedHandler;
+    private final ServletAuthenticationEntryPoint customAuthenticationEntryPoint;
     private final BCryptPasswordEncoder passwordEncoder;
 
     @Bean

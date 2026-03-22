@@ -17,6 +17,7 @@
   <name>booking-app</name>
   <url>http://maven.apache.org</url>
   <modules>
+    <module>common-lib</module>
     <module>booking-service</module>
     <module>property-service</module>
       <module>review-service</module>

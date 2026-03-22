@@ -1,12 +1,12 @@
 package com.example.userservice.controllers;
 
+import com.example.common.exception.ErrorResponse;
 import com.example.userservice.dto.JwtRequest;
 import com.example.userservice.dto.JwtResponse;
 import com.example.userservice.dto.SaveUserDTO;
 import com.example.userservice.dto.UserDTO;
 import com.example.userservice.services.AuthService;
 import com.example.userservice.util.AuthException;
-import com.example.userservice.util.ErrorResponse;
 import com.example.userservice.util.ErrorsUtil;
 import com.example.userservice.util.UserException;
 import jakarta.validation.Valid;
