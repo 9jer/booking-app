@@ -5,7 +5,11 @@ import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 
-@FeignClient(name = "property-service", configuration = FeignClientConfig.class)
+@FeignClient(
+        name = "property-service",
+        configuration = FeignClientConfig.class,
+        fallback = PropertyClientFallback.class
+)
 public interface PropertyClient {
 
     @GetMapping(path = "${feign-client.endpoint.property-exists}")

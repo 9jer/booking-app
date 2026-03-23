@@ -9,7 +9,11 @@ import org.springframework.web.bind.annotation.RequestParam;
 
 import java.time.LocalDate;
 
-@FeignClient(name = "booking-service", configuration = FeignClientConfig.class)
+@FeignClient(
+        name = "booking-service",
+        configuration = FeignClientConfig.class,
+        fallback = BookingClientFallback.class
+)
 public interface BookingClient {
 
     @GetMapping(path = "${feign-client.endpoint.property-availability}")
