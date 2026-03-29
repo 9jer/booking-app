@@ -37,7 +37,7 @@ public class SecurityConfig {
                         .pathMatchers(HttpMethod.GET, "/api/v1/reviews/**").permitAll()
                         .pathMatchers("/api/v1/auth/**", "/swagger-ui.html",
                                 "/swagger-ui/**", "/v3/api-docs/**", "/swagger-resources/**",
-                                "/api-docs/**", "/webjars/**","/aggregate/**").permitAll()
+                                "/api-docs/**", "/webjars/**","/aggregate/**", "/actuator/**").permitAll()
                         .anyExchange().authenticated()
                 )
                 .addFilterBefore(jwtRequestFilter, SecurityWebFiltersOrder.AUTHENTICATION)

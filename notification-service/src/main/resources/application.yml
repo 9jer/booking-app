@@ -12,6 +12,10 @@ spring:
       properties:
         schema.registry.url: http://127.0.0.1:8086
         specific.avro.reader: true
+    listener:
+      observation-enabled: true
+    template:
+      observation-enabled: true
   mail:
     host: sandbox.smtp.mailtrap.io
     port: 2525
@@ -28,6 +32,24 @@ eureka:
   instance:
     instance-id: notification-service-instance-${random.uuid}
     prefer-ip-address: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, prometheus
+  metrics:
+    tags:
+      application: ${spring.application.name}
+  tracing:
+    sampling:
+      probability: 1.0
+  otlp:
+    tracing:
+      endpoint: http://localhost:4318/v1/traces
+  opentelemetry:
+    resource-attributes:
+      service.name: ${spring.application.name}
 
 server:
   port: 8085

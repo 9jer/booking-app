@@ -36,11 +36,14 @@ spring:
     bootstrap-servers: localhost:9092
     template:
       default-topic: booking-created
+      observation-enabled: true
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: io.confluent.kafka.serializers.KafkaAvroSerializer
       properties:
         schema.registry.url: http://127.0.0.1:8086
+    listener:
+      observation-enabled: true
   cloud:
     openfeign:
       circuitbreaker:
@@ -68,9 +71,6 @@ springdoc:
   api-docs:
     path: /v3/api-docs
 
-jwt:
-  secret: ${jwt.secret}
-
 eureka:
   client:
     serviceUrl:
@@ -78,6 +78,31 @@ eureka:
   instance:
     instance-id: booking-service-instance-${random.uuid}
     prefer-ip-address: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, prometheus
+  metrics:
+    tags:
+      application: ${spring.application.name}
+  tracing:
+    sampling:
+      probability: 1.0
+  otlp:
+    tracing:
+      endpoint: http://localhost:4318/v1/traces
+  opentelemetry:
+    resource-attributes:
+      service.name: ${spring.application.name}
+
+logging:
+  pattern:
+    level: "%5p [${spring.application.name:},%X{traceId:-},%X{spanId:-}]"
+
+jwt:
+  secret: ${jwt.secret}
 
 server:
   port: 8082
