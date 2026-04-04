@@ -1,5 +1,7 @@
 package com.example.apigateway.config;
 
+import com.example.common.security.ReactiveAccessDeniedHandler;
+import com.example.common.security.ReactiveAuthenticationEntryPoint;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -19,8 +21,8 @@ import java.util.List;
 @RequiredArgsConstructor
 public class SecurityConfig {
     private final JwtRequestFilter jwtRequestFilter;
-    private final CustomAccessDeniedHandler customAccessDeniedHandler;
-    private final CustomAuthenticationEntryPoint customAuthenticationEntryPoint;
+    private final ReactiveAccessDeniedHandler customAccessDeniedHandler;
+    private final ReactiveAuthenticationEntryPoint customAuthenticationEntryPoint;
 
     @Bean
     public SecurityWebFilterChain securityWebFilterChain(ServerHttpSecurity http) {
@@ -35,7 +37,7 @@ public class SecurityConfig {
                         .pathMatchers(HttpMethod.GET, "/api/v1/reviews/**").permitAll()
                         .pathMatchers("/api/v1/auth/**", "/swagger-ui.html",
                                 "/swagger-ui/**", "/v3/api-docs/**", "/swagger-resources/**",
-                                "/api-docs/**", "/webjars/**","/aggregate/**").permitAll()
+                                "/api-docs/**", "/webjars/**","/aggregate/**", "/actuator/**").permitAll()
                         .anyExchange().authenticated()
                 )
                 .addFilterBefore(jwtRequestFilter, SecurityWebFiltersOrder.AUTHENTICATION)

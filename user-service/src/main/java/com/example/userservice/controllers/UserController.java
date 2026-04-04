@@ -1,10 +1,10 @@
 package com.example.userservice.controllers;
 
+import com.example.common.exception.ErrorResponse;
 import com.example.userservice.dto.UpdateUserDTO;
 import com.example.userservice.dto.UserDTO;
 import com.example.userservice.security.CustomUserDetailsService;
 import com.example.userservice.services.UserService;
-import com.example.userservice.util.ErrorResponse;
 import com.example.userservice.util.ErrorsUtil;
 import com.example.userservice.util.JwtTokenUtils;
 import com.example.userservice.util.UserException;

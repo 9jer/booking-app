@@ -1,0 +1,3 @@
+com.example.common.config.CommonSecurityAutoConfiguration
+com.example.common.feign.FeignClientConfig
+com.example.common.logging.LoggingAutoConfiguration

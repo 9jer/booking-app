@@ -1,6 +1,7 @@
 package com.example.propertyservice.controllers;
 
 import com.example.propertyservice.dto.*;
+import com.example.propertyservice.mapper.PropertyMapper;
 import com.example.propertyservice.models.Property;
 import com.example.propertyservice.services.PropertyService;
 import com.example.propertyservice.util.PropertyException;
@@ -10,7 +11,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.modelmapper.ModelMapper;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
@@ -36,7 +36,7 @@ class PropertyControllerTest {
     private PropertyService propertyService;
 
     @Mock
-    private ModelMapper modelMapper;
+    private PropertyMapper propertyMapper;
 
     @Mock
     private BindingResult bindingResult;
@@ -81,7 +81,7 @@ class PropertyControllerTest {
     void createProperty_ValidRequest_ReturnsGetPropertyDTO() {
         // Given
         when(bindingResult.hasErrors()).thenReturn(false);
-        when(modelMapper.map(any(PropertyDTO.class), eq(Property.class))).thenReturn(property);
+        when(propertyMapper.toProperty(any(PropertyDTO.class))).thenReturn(property);
         when(propertyService.save(any(Property.class), anyString())).thenReturn(getPropertyDTO);
 
         // When
@@ -94,7 +94,7 @@ class PropertyControllerTest {
         assertEquals(getPropertyDTO, response.getBody());
 
         verify(propertyService, times(1)).save(any(Property.class), anyString());
-        verify(modelMapper, times(1)).map(any(PropertyDTO.class), eq(Property.class));
+        verify(propertyMapper, times(1)).toProperty(any(PropertyDTO.class));
     }
 
     @Test
@@ -114,7 +114,7 @@ class PropertyControllerTest {
     void updateProperty_ValidRequest_ReturnsUpdatedGetPropertyDTO() {
         // Given
         when(bindingResult.hasErrors()).thenReturn(false);
-        when(modelMapper.map(any(PropertyDTO.class), eq(Property.class))).thenReturn(property);
+        when(propertyMapper.toProperty(any(PropertyDTO.class))).thenReturn(property);
         when(propertyService.updatePropertyById(anyLong(), any(Property.class), anyString())).thenReturn(getPropertyDTO);
 
         // When
@@ -126,7 +126,7 @@ class PropertyControllerTest {
         assertEquals(getPropertyDTO, response.getBody());
 
         verify(propertyService, times(1)).updatePropertyById(anyLong(), any(Property.class), anyString());
-        verify(modelMapper, times(1)).map(any(PropertyDTO.class), eq(Property.class));
+        verify(propertyMapper, times(1)).toProperty(any(PropertyDTO.class));
     }
 
     @Test

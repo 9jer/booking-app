@@ -2,13 +2,13 @@ package com.example.userservice.services;
 
 import com.example.userservice.dto.UpdateUserDTO;
 import com.example.userservice.dto.UserDTO;
+import com.example.userservice.mapper.UserMapper;
 import com.example.userservice.models.Role;
 import com.example.userservice.models.User;
 import com.example.userservice.repositories.UserRepository;
 import com.example.userservice.util.JwtTokenUtils;
 import com.example.userservice.util.UserException;
 import lombok.RequiredArgsConstructor;
-import org.modelmapper.ModelMapper;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.CachePut;
 import org.springframework.cache.annotation.Cacheable;
@@ -32,7 +32,7 @@ public class UserServiceImpl implements UserService {
     private final UserRepository userRepository;
     private final RoleService roleService;
     private final PasswordEncoder passwordEncoder;
-    private final ModelMapper modelMapper;
+    private final UserMapper userMapper;
     private final JwtTokenUtils jwtTokenUtils;
 
     @Override
@@ -148,7 +148,7 @@ public class UserServiceImpl implements UserService {
     }
 
     private UserDTO convertToUserDTO(User user) {
-        UserDTO dto = modelMapper.map(user, UserDTO.class);
+        UserDTO dto = userMapper.toUserDTO(user);
         if (user.getRoles() != null) {
             dto.setRoles(user.getRoles().stream()
                     .map(Role::getName)
@@ -158,7 +158,7 @@ public class UserServiceImpl implements UserService {
     }
 
     private User convertUpdateUserDTOToUser(UpdateUserDTO updateUserDTO){
-        return modelMapper.map(updateUserDTO, User.class);
+        return userMapper.toUser(updateUserDTO);
     }
 
     private void enrichPropertyForUpdate(User existingUser, User updatedUser) {

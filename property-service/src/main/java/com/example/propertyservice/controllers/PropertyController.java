@@ -3,6 +3,7 @@ package com.example.propertyservice.controllers;
 import com.example.propertyservice.dto.AvailableDatesResponse;
 import com.example.propertyservice.dto.GetPropertyDTO;
 import com.example.propertyservice.dto.PropertyDTO;
+import com.example.propertyservice.mapper.PropertyMapper;
 import com.example.propertyservice.models.Property;
 import com.example.propertyservice.services.PropertyService;
 import com.example.propertyservice.util.ErrorsUtil;
@@ -11,7 +12,6 @@ import com.example.propertyservice.util.PropertyException;
 import io.swagger.v3.oas.annotations.Parameter;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.modelmapper.ModelMapper;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
@@ -30,7 +30,7 @@ import java.time.LocalDate;
 public class PropertyController {
 
     private final PropertyService propertyService;
-    private final ModelMapper modelMapper;
+    private final PropertyMapper propertyMapper;
 
     @PostMapping
     public ResponseEntity<GetPropertyDTO> createProperty(@Parameter(hidden = true) @RequestHeader("Authorization") String authorizationHeader,
@@ -132,7 +132,7 @@ public class PropertyController {
     }
 
     private Property convertPropertyDTOToProperty(PropertyDTO propertyDTO) {
-        return modelMapper.map(propertyDTO, Property.class);
+        return propertyMapper.toProperty(propertyDTO);
     }
 
     @ExceptionHandler

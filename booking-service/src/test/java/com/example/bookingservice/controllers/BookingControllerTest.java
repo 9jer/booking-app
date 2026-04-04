@@ -1,6 +1,7 @@
 package com.example.bookingservice.controllers;
 
 import com.example.bookingservice.dto.*;
+import com.example.bookingservice.mapper.BookingMapper;
 import com.example.bookingservice.models.Booking;
 import com.example.bookingservice.models.BookingHistory;
 import com.example.bookingservice.models.BookingStatus;
@@ -12,7 +13,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.modelmapper.ModelMapper;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
@@ -38,7 +38,7 @@ class BookingControllerTest {
     private BookingService bookingService;
 
     @Mock
-    private ModelMapper modelMapper;
+    private BookingMapper bookingMapper;
 
     @Mock
     private BindingResult bindingResult;
@@ -102,7 +102,7 @@ class BookingControllerTest {
         assertEquals(getBookingDTO, response.getBody().getContent().get(0));
 
         verify(bookingService, times(1)).getAllBookings(anyString(), any(Pageable.class));
-        verify(modelMapper, never()).map(any(Booking.class), eq(GetBookingDTO.class));
+        verify(bookingMapper, never()).toGetBookingDTO(any(Booking.class));
     }
 
     @Test
@@ -120,7 +120,7 @@ class BookingControllerTest {
         assertEquals(getBookingDTO, response.getBody());
 
         verify(bookingService, times(1)).getBookingById(eq(1L), anyString());
-        verify(modelMapper, never()).map(any(Booking.class), eq(GetBookingDTO.class));
+        verify(bookingMapper, never()).toGetBookingDTO(any(Booking.class));
     }
 
     @Test
@@ -150,14 +150,14 @@ class BookingControllerTest {
         assertEquals(bookingHistoryDTO, response.getBody().getHistory().get(0));
 
         verify(bookingService, times(1)).getBookingHistoryByBookingId(1L);
-        verify(modelMapper, never()).map(any(BookingHistory.class), eq(BookingHistoryDTO.class));
+        verify(bookingMapper, never()).toBookingHistoryDTO(any(BookingHistory.class));
     }
 
     @Test
     void createBooking_ValidRequest_ReturnsCreatedResponse() {
         // Given
         when(bindingResult.hasErrors()).thenReturn(false);
-        when(modelMapper.map(any(BookingDTO.class), eq(Booking.class))).thenReturn(booking);
+        when(bookingMapper.toBooking(any(BookingDTO.class))).thenReturn(booking);
         when(bookingService.createBooking(any(Booking.class), anyString())).thenReturn(getBookingDTO);
 
         // When
@@ -172,7 +172,7 @@ class BookingControllerTest {
         assertEquals(getBookingDTO, response.getBody());
 
         verify(bookingService, times(1)).createBooking(any(Booking.class), anyString());
-        verify(modelMapper, times(1)).map(any(BookingDTO.class), eq(Booking.class));
+        verify(bookingMapper, times(1)).toBooking(any(BookingDTO.class));
     }
 
     @Test
@@ -204,7 +204,7 @@ class BookingControllerTest {
         assertEquals(getBookingDTO, response.getBody());
 
         verify(bookingService, times(1)).updateBookingStatus(eq(1L), eq(BookingStatus.CANCELLED), anyString());
-        verify(modelMapper, never()).map(any(Booking.class), eq(GetBookingDTO.class));
+        verify(bookingMapper, never()).toGetBookingDTO(any(Booking.class));
     }
 
     @Test

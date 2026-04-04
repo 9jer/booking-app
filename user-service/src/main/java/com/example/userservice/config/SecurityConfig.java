@@ -1,5 +1,7 @@
 package com.example.userservice.config;
 
+import com.example.common.security.ServletAccessDeniedHandler;
+import com.example.common.security.ServletAuthenticationEntryPoint;
 import com.example.userservice.security.CustomUserDetailsService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
@@ -27,22 +29,14 @@ import java.util.List;
 public class SecurityConfig {
     private final CustomUserDetailsService customUserDetailsService;
     private final JwtRequestFilter jwtRequestFilter;
-    private final CustomAccessDeniedHandler customAccessDeniedHandler;
-    private final CustomAuthenticationEntryPoint customAuthenticationEntryPoint;
+    private final ServletAccessDeniedHandler customAccessDeniedHandler;
+    private final ServletAuthenticationEntryPoint customAuthenticationEntryPoint;
     private final BCryptPasswordEncoder passwordEncoder;
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
                 .csrf(AbstractHttpConfigurer::disable)
-                .cors(cors -> cors.configurationSource(request -> {
-                    var corsConfiguration = new CorsConfiguration();
-                    corsConfiguration.setAllowedOriginPatterns(List.of("http://localhost:5173", "http://localhost:3000", "http://localhost:8080"));
-                    corsConfiguration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
-                    corsConfiguration.setAllowedHeaders(List.of("*"));
-                    corsConfiguration.setAllowCredentials(true);
-                    return corsConfiguration;
-                }))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/v1/auth/**").permitAll()
                         .requestMatchers("/api/v1/users/{id}/assign-owner").hasRole("ADMIN")
@@ -50,7 +44,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.DELETE, "/api/v1/users/{id}").authenticated()
                         .requestMatchers(HttpMethod.DELETE, "/api/v1/**").hasAnyRole("OWNER", "ADMIN")
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                        .requestMatchers("/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**").permitAll()
+                        .requestMatchers("/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**", "/actuator/**").permitAll()
                         .anyRequest().authenticated()
                 )
                 //.httpBasic(Customizer.withDefaults())

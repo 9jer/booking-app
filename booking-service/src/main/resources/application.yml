@@ -36,20 +36,40 @@ spring:
     bootstrap-servers: localhost:9092
     template:
       default-topic: booking-created
+      observation-enabled: true
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: io.confluent.kafka.serializers.KafkaAvroSerializer
       properties:
         schema.registry.url: http://127.0.0.1:8086
+    listener:
+      observation-enabled: true
+  cloud:
+    openfeign:
+      circuitbreaker:
+        enabled: true
+
+resilience4j:
+  circuitbreaker:
+    configs:
+      default:
+        registerHealthIndicator: true
+        slidingWindowSize: 10
+        minimumNumberOfCalls: 5
+        permittedNumberOfCallsInHalfOpenState: 3
+        automaticTransitionFromOpenToHalfOpenEnabled: true
+        waitDurationInOpenState: 5s
+        failureRateThreshold: 50
+  timelimiter:
+    configs:
+      default:
+        timeoutDuration: 3s
 
 springdoc:
   swagger-ui:
     path: /swagger-ui.html
   api-docs:
     path: /v3/api-docs
-
-jwt:
-  secret: ${jwt.secret}
 
 eureka:
   client:
@@ -58,6 +78,31 @@ eureka:
   instance:
     instance-id: booking-service-instance-${random.uuid}
     prefer-ip-address: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, prometheus
+  metrics:
+    tags:
+      application: ${spring.application.name}
+  tracing:
+    sampling:
+      probability: 1.0
+  otlp:
+    tracing:
+      endpoint: http://localhost:4318/v1/traces
+  opentelemetry:
+    resource-attributes:
+      service.name: ${spring.application.name}
+
+logging:
+  pattern:
+    level: "%5p [${spring.application.name:},%X{traceId:-},%X{spanId:-}]"
+
+jwt:
+  secret: ${jwt.secret}
 
 server:
   port: 8082
@@ -76,5 +121,6 @@ application:
 feign-client:
   endpoint:
     property-exists: /api/v1/properties/{id}/exists
-    user-exists: api/v1/users/{id}/exists
     get-property-by-id: /api/v1/properties/{id}
+    user-exists: /api/v1/users/{id}/exists
+    get-user-by-id: /api/v1/users/{id}

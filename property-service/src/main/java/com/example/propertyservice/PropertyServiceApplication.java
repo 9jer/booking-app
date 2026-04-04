@@ -1,7 +1,6 @@
 package com.example.propertyservice;
 
 import com.fasterxml.jackson.datatype.hibernate6.Hibernate6Module;
-import org.modelmapper.ModelMapper;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.cache.annotation.EnableCaching;
@@ -17,11 +16,6 @@ public class PropertyServiceApplication {
 
     public static void main(String[] args) {
         SpringApplication.run(PropertyServiceApplication.class, args);
-    }
-
-    @Bean
-    public ModelMapper modelMapper() {
-        return new ModelMapper();
     }
 
     @Bean

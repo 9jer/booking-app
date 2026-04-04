@@ -4,6 +4,7 @@ import com.example.userservice.dto.JwtRequest;
 import com.example.userservice.dto.JwtResponse;
 import com.example.userservice.dto.SaveUserDTO;
 import com.example.userservice.dto.UserDTO;
+import com.example.userservice.mapper.UserMapper;
 import com.example.userservice.models.Role;
 import com.example.userservice.models.User;
 import com.example.userservice.security.CustomUserDetails;
@@ -17,7 +18,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.modelmapper.ModelMapper;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -45,7 +45,7 @@ class AuthServiceImplTest {
     private AuthenticationManager authenticationManager;
 
     @Mock
-    private ModelMapper modelMapper;
+    private UserMapper userMapper;
 
     @Mock
     private RoleService roleService;
@@ -126,7 +126,7 @@ class AuthServiceImplTest {
         // Given
         when(userService.findByUsername("testuser")).thenReturn(Optional.empty());
         when(userService.findByEmail("test@example.com")).thenReturn(Optional.empty());
-        when(modelMapper.map(saveUserDTO, User.class)).thenReturn(user);
+        when(userMapper.toUser(saveUserDTO)).thenReturn(user);
 
         Role guestRole = new Role();
         guestRole.setName("ROLE_GUEST");
@@ -181,7 +181,7 @@ class AuthServiceImplTest {
 
         when(userService.findByUsername("testuser")).thenReturn(Optional.empty());
         when(userService.findByEmail("test@example.com")).thenReturn(Optional.empty());
-        when(modelMapper.map(saveUserDTO, User.class)).thenReturn(user);
+        when(userMapper.toUser(saveUserDTO)).thenReturn(user);
 
         Role guestRole = new Role();
         guestRole.setName("ROLE_GUEST");
