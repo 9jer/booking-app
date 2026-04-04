@@ -1,8 +1,11 @@
 package com.example.propertyservice.services;
 
+import com.example.propertyservice.client.BookingClient;
 import com.example.propertyservice.client.UserClient;
+import com.example.propertyservice.dto.AvailableDatesResponse;
 import com.example.propertyservice.dto.GetPropertyDTO;
 import com.example.propertyservice.mapper.PropertyMapper;
+import com.example.propertyservice.models.Favorite;
 import com.example.propertyservice.models.Property;
 import com.example.propertyservice.models.PropertyFeature;
 import com.example.propertyservice.repositories.FavoriteRepository;
@@ -25,6 +28,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.SimpleTransactionStatus;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.*;
 
@@ -43,6 +47,9 @@ class PropertyServiceImplTest {
 
     @Mock
     private FavoriteRepository favoriteRepository;
+
+    @Mock
+    private BookingClient bookingClient;
 
     @Mock
     private UserClient userClient;
@@ -309,5 +316,125 @@ class PropertyServiceImplTest {
 
         // Then
         assertEquals(1, result.getTotalElements());
+    }
+
+    @Test
+    void getAvailableDates_ShouldReturnDatesFromBookingClient() {
+        // Given
+        Long propertyId = 1L;
+        List<LocalDate> expectedDates = List.of(LocalDate.now(), LocalDate.now().plusDays(1));
+
+        AvailableDatesResponse mockResponse = new AvailableDatesResponse(expectedDates);
+
+        when(bookingClient.getAvailableDates(propertyId)).thenReturn(mockResponse);
+
+        // When
+        List<LocalDate> actualDates = propertyService.getAvailableDates(propertyId);
+
+        // Then
+        assertEquals(expectedDates, actualDates);
+        verify(bookingClient, times(1)).getAvailableDates(propertyId);
+    }
+
+    @Test
+    void getAvailableDates_WhenBookingServiceIsDown_ShouldReturnEmptyList() {
+        // Given
+        Long propertyId = 1L;
+
+        AvailableDatesResponse emptyResponse = new AvailableDatesResponse(java.util.Collections.emptyList());
+
+        when(bookingClient.getAvailableDates(propertyId)).thenReturn(emptyResponse);
+
+        // When
+        List<LocalDate> actualDates = propertyService.getAvailableDates(propertyId);
+
+        // Then
+        assertTrue(actualDates.isEmpty());
+        verify(bookingClient, times(1)).getAvailableDates(propertyId);
+    }
+
+    @Test
+    void getUserFavorites_ShouldReturnPagedFavorites() {
+        // Given
+        String token = "Bearer test.token";
+        Long userId = 1L;
+        Pageable pageable = PageRequest.of(0, 10);
+
+        Property property = new Property();
+        property.setId(100L);
+        property.setTitle("My Favorite Villa");
+        property.setPricePerNight(java.math.BigDecimal.valueOf(100));
+        property.setLocation("Sydney");
+
+        Favorite favorite = new Favorite();
+        favorite.setUserId(userId);
+        favorite.setProperty(property);
+
+        GetPropertyDTO expectedDto = new GetPropertyDTO();
+        expectedDto.setId(100L);
+        expectedDto.setTitle("My Favorite Villa");
+
+        Page<Favorite> favoritePage = new org.springframework.data.domain.PageImpl<>(List.of(favorite));
+
+        when(jwtTokenUtils.getUserId(token)).thenReturn(userId);
+        when(favoriteRepository.findAllByUserId(userId, pageable)).thenReturn(favoritePage);
+        when(propertyMapper.toGetPropertyDTO(property)).thenReturn(expectedDto);
+
+        // When
+        Page<GetPropertyDTO> result = propertyService.getUserFavorites(token, pageable);
+
+        // Then
+        assertNotNull(result);
+        assertEquals(1, result.getContent().size());
+        assertEquals("My Favorite Villa", result.getContent().get(0).getTitle());
+
+        verify(favoriteRepository, times(1)).findAllByUserId(userId, pageable);
+        verify(propertyMapper, times(1)).toGetPropertyDTO(property);
+    }
+
+    @Test
+    void toggleFavorite_WhenNotExists_ShouldSaveNewFavorite() {
+        // Given
+        Long propertyId = 100L;
+        String token = "Bearer test.token";
+        Long userId = 1L;
+        Property property = new Property();
+        property.setId(propertyId);
+
+        when(jwtTokenUtils.getUserId(token)).thenReturn(userId);
+        when(propertyRepository.findById(propertyId)).thenReturn(Optional.of(property));
+        when(favoriteRepository.findByUserIdAndPropertyId(userId, propertyId)).thenReturn(Optional.empty());
+
+        // When
+        propertyService.toggleFavorite(propertyId, token);
+
+        // Then
+        verify(favoriteRepository, times(1)).save(any(Favorite.class));
+        verify(favoriteRepository, never()).delete(any(Favorite.class));
+    }
+
+    @Test
+    void toggleFavorite_WhenExists_ShouldDeleteFavorite() {
+        // Given
+        Long propertyId = 100L;
+        String token = "Bearer test.token";
+        Long userId = 1L;
+        Property property = new Property();
+        property.setId(propertyId);
+
+        Favorite existingFavorite = new Favorite();
+        existingFavorite.setUserId(userId);
+        existingFavorite.setProperty(property);
+
+        when(jwtTokenUtils.getUserId(token)).thenReturn(userId);
+        when(propertyRepository.findById(propertyId)).thenReturn(Optional.of(property));
+        when(favoriteRepository.findByUserIdAndPropertyId(userId, propertyId)).thenReturn(Optional.of(existingFavorite));
+
+        // When
+        propertyService.toggleFavorite(propertyId, token);
+
+        // Then
+        verify(favoriteRepository, times(1)).delete(existingFavorite);
+        verify(favoriteRepository, never()).save(any(Favorite.class));
     }
 }

@@ -14,6 +14,10 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -79,6 +83,118 @@ class UserServiceImplTest {
         ownerRole = new Role();
         ownerRole.setId(2);
         ownerRole.setName("ROLE_OWNER");
+    }
+
+    @Test
+    void findByUsername_ShouldReturnOptionalUser() {
+        // Given
+        when(userRepository.findByUsername("testuser")).thenReturn(Optional.of(user));
+
+        // Act
+        Optional<User> result = userService.findByUsername("testuser");
+
+        // Then
+        assertTrue(result.isPresent());
+        assertEquals("testuser", result.get().getUsername());
+        verify(userRepository, times(1)).findByUsername("testuser");
+    }
+
+    @Test
+    void findByEmail_ShouldReturnOptionalUser() {
+        // Given
+        when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(user));
+
+        // Act
+        Optional<User> result = userService.findByEmail("test@example.com");
+
+        // Then
+        assertTrue(result.isPresent());
+        assertEquals("test@example.com", result.get().getEmail());
+        verify(userRepository, times(1)).findByEmail("test@example.com");
+    }
+
+    @Test
+    void findAll_ShouldReturnPagedUserDTOs() {
+        // Given
+        Pageable pageable = PageRequest.of(0, 10);
+        Page<User> userPage = new PageImpl<>(List.of(user));
+
+        when(userRepository.findAll(pageable)).thenReturn(userPage);
+        when(userMapper.toUserDTO(any(User.class))).thenReturn(userDTO);
+
+        // Act
+        Page<UserDTO> result = userService.findAll(pageable);
+
+        // Then
+        assertNotNull(result);
+        assertEquals(1, result.getContent().size());
+        assertEquals("testuser", result.getContent().get(0).getUsername());
+        verify(userRepository, times(1)).findAll(pageable);
+    }
+
+    @Test
+    void getUserById_WhenUserFound_ShouldReturnUserDTO() {
+        // Given
+        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+        when(userMapper.toUserDTO(user)).thenReturn(userDTO);
+
+        // Act
+        UserDTO result = userService.getUserById(1L);
+
+        // Then
+        assertNotNull(result);
+        assertEquals(1L, result.getId());
+        verify(userRepository, times(1)).findById(1L);
+    }
+
+    @Test
+    void getUserById_WhenUserNotFound_ShouldThrowException() {
+        // Given
+        when(userRepository.findById(99L)).thenReturn(Optional.empty());
+
+        // When & Then
+        UserException exception = assertThrows(UserException.class,
+                () -> userService.getUserById(99L));
+        assertEquals("User 99 not found", exception.getMessage());
+    }
+
+    @Test
+    void getUserByUsername_WhenUserFound_ShouldReturnUserDTO() {
+        // Given
+        when(userRepository.findByUsername("testuser")).thenReturn(Optional.of(user));
+        when(userMapper.toUserDTO(user)).thenReturn(userDTO);
+
+        // Act
+        UserDTO result = userService.getUserByUsername("testuser");
+
+        // Then
+        assertNotNull(result);
+        assertEquals("testuser", result.getUsername());
+        verify(userRepository, times(1)).findByUsername("testuser");
+    }
+
+    @Test
+    void getUserByUsername_WhenUserNotFound_ShouldThrowException() {
+        // Given
+        when(userRepository.findByUsername("unknown")).thenReturn(Optional.empty());
+
+        // When & Then
+        UserException exception = assertThrows(UserException.class,
+                () -> userService.getUserByUsername("unknown"));
+        assertEquals("User not found with username: unknown", exception.getMessage());
+    }
+
+    @Test
+    void existsById_ShouldReturnBoolean() {
+        // Given
+        when(userRepository.existsById(1L)).thenReturn(true);
+
+        // Act
+        Boolean result = userService.existsById(1L);
+
+        // Then
+        assertTrue(result);
+        verify(userRepository, times(1)).existsById(1L);
     }
 
     @Test

@@ -1,157 +1,179 @@
 package com.example.userservice.controllers;
 
+import com.example.userservice.BaseIntegrationTest;
 import com.example.userservice.dto.UpdateUserDTO;
-import com.example.userservice.dto.UserDTO;
-import com.example.userservice.security.CustomUserDetailsService;
-import com.example.userservice.services.UserService;
-import com.example.userservice.util.JwtTokenUtils;
-import com.example.userservice.util.UserException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import org.junit.jupiter.api.BeforeEach;
+import com.example.userservice.models.User;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
-import org.springframework.data.domain.PageImpl;
-import org.springframework.data.domain.Pageable;
 import org.springframework.http.MediaType;
-import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.List;
 
-import static org.mockito.ArgumentMatchers.*;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@WebMvcTest(UserController.class)
-@AutoConfigureMockMvc(addFilters = false)
-class UserControllerIT {
+class UserControllerIT extends BaseIntegrationTest {
 
     private static final String USERS_ROOT_ENDPOINT = "/api/v1/users";
     private static final String USERS_ID_ENDPOINT = USERS_ROOT_ENDPOINT + "/{id}";
     private static final String ASSIGN_OWNER_ENDPOINT = USERS_ID_ENDPOINT + "/assign-owner";
     private static final String EXISTS_ENDPOINT = USERS_ID_ENDPOINT + "/exists";
 
-    @Autowired
-    private MockMvc mockMvc;
-
-    @Autowired
-    private ObjectMapper objectMapper;
-
-    @MockBean
-    private UserService userService;
-
-    @MockBean
-    private JwtTokenUtils jwtTokenUtils;
-
-    @MockBean
-    private CustomUserDetailsService customUserDetailsService;
-
-    private UserDTO testUserDTO;
-    private UpdateUserDTO testUpdateUserDTO;
-    private String validToken = "valid.token.here";
-
-    @BeforeEach
-    void setUp() {
-        testUserDTO = new UserDTO();
-        testUserDTO.setId(1L);
-        testUserDTO.setUsername("testuser");
-        testUserDTO.setEmail("test@example.com");
-        testUserDTO.setFirstName("Test");
-        testUserDTO.setLastName("User");
-        testUserDTO.setPhone("1234567890");
-
-        testUpdateUserDTO = new UpdateUserDTO();
-        testUpdateUserDTO.setUsername("testuser");
-        testUpdateUserDTO.setEmail("test@example.com");
-        testUpdateUserDTO.setFirstName("Test");
-        testUpdateUserDTO.setLastName("User");
-        testUpdateUserDTO.setPhone("1234567890");
-
-        Mockito.when(jwtTokenUtils.getUsername(anyString())).thenReturn("testuser");
-        Mockito.when(jwtTokenUtils.getUserId(anyString())).thenReturn(1L);
-        Mockito.when(jwtTokenUtils.getRoles(anyString())).thenReturn(List.of("ROLE_USER"));
-    }
-
     @Test
     void getAllUsers_ShouldReturnListOfUsers() throws Exception {
-        Mockito.when(userService.findAll(any(Pageable.class)))
-                .thenReturn(new PageImpl<>(List.of(testUserDTO)));
+        // Given
+        String token = createTestUserAndGetToken("list_user", "pass", List.of("ROLE_USER"));
 
+        // When & Then
         mockMvc.perform(get(USERS_ROOT_ENDPOINT)
+                        .header("Authorization", "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.content[0].id").value(testUserDTO.getId()))
-                .andExpect(jsonPath("$.content[0].username").value(testUserDTO.getUsername()));
+                .andExpect(jsonPath("$.content").isArray())
+                .andExpect(jsonPath("$.content[0].username").exists());
     }
 
     @Test
     void getUserById_ShouldReturnUser() throws Exception {
-        Mockito.when(userService.getUserById(anyLong())).thenReturn(testUserDTO);
+        // Given
+        String token = createTestUserAndGetToken("target_user", "pass", List.of("ROLE_USER"));
+        User user = userRepository.findByUsername("target_user").orElseThrow();
 
-        mockMvc.perform(get(USERS_ID_ENDPOINT, 1L)
+        // When & Then
+        mockMvc.perform(get(USERS_ID_ENDPOINT, user.getId())
+                        .header("Authorization", "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id").value(testUserDTO.getId()))
-                .andExpect(jsonPath("$.username").value(testUserDTO.getUsername()));
+                .andExpect(jsonPath("$.id").value(user.getId()))
+                .andExpect(jsonPath("$.username").value("target_user"));
     }
 
     @Test
     void updateUserInfo_WithValidData_ShouldReturnUpdatedUser() throws Exception {
-        Mockito.when(userService.updateUser(any(UpdateUserDTO.class), anyString()))
-                .thenReturn(testUserDTO);
+        // Given
+        String token = createTestUserAndGetToken("update_user", "pass", List.of("ROLE_USER"));
 
+        UpdateUserDTO updateRequest = new UpdateUserDTO();
+        updateRequest.setUsername("update_user");
+        updateRequest.setEmail("new_email@example.com");
+        updateRequest.setFirstName("UpdatedName");
+        updateRequest.setLastName("UpdatedLastName");
+        updateRequest.setPhone("+375291234567");
+
+        // When
         mockMvc.perform(patch(USERS_ROOT_ENDPOINT)
-                        .header("Authorization", "Bearer " + validToken)
+                        .header("Authorization", "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(testUpdateUserDTO)))
+                        .content(objectMapper.writeValueAsString(updateRequest)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id").value(testUserDTO.getId()));
+                .andExpect(jsonPath("$.email").value("new_email@example.com"))
+                .andExpect(jsonPath("$.firstName").value("UpdatedName"));
+
+        // Then
+        User updatedUser = userRepository.findByUsername("update_user").orElseThrow();
+        assertThat(updatedUser.getEmail()).isEqualTo("new_email@example.com");
+        assertThat(updatedUser.getFirstName()).isEqualTo("UpdatedName");
     }
 
     @Test
     void assignOwnerRole_ShouldReturnUpdatedUser() throws Exception {
-        Mockito.when(userService.assignOwnerRole(anyLong())).thenReturn(testUserDTO);
+        // Given
+        String token = createTestUserAndGetToken("future_owner", "pass", List.of("ROLE_ADMIN"));
+        User user = userRepository.findByUsername("future_owner").orElseThrow();
 
-        mockMvc.perform(post(ASSIGN_OWNER_ENDPOINT, 1L)
+        roleRepository.findByName("ROLE_OWNER").orElseGet(() -> {
+            com.example.userservice.models.Role ownerRole = new com.example.userservice.models.Role();
+            ownerRole.setName("ROLE_OWNER");
+            return roleRepository.save(ownerRole);
+        });
+
+        // When
+        mockMvc.perform(post(ASSIGN_OWNER_ENDPOINT, user.getId())
+                        .header("Authorization", "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id").value(testUserDTO.getId()));
+                .andExpect(jsonPath("$.id").value(user.getId()));
+
+        // Then
+        User updatedUser = userRepository.findById(user.getId()).orElseThrow();
+        boolean hasOwnerRole = updatedUser.getRoles().stream()
+                .anyMatch(role -> role.getName().equals("ROLE_OWNER"));
+        assertThat(hasOwnerRole).isTrue();
     }
 
     @Test
     void userExists_ShouldReturnBoolean() throws Exception {
-        Mockito.when(userService.existsById(anyLong())).thenReturn(true);
+        // Given
+        String token = createTestUserAndGetToken("check_user", "pass", List.of("ROLE_USER"));
+        User user = userRepository.findByUsername("check_user").orElseThrow();
 
-        mockMvc.perform(get(EXISTS_ENDPOINT, 1L)
+        // When & Then
+        mockMvc.perform(get(EXISTS_ENDPOINT, user.getId())
+                        .header("Authorization", "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(content().string("true"));
     }
 
     @Test
-    void updateUserInfo_WhenUserNotFound_ShouldReturnNotFound() throws Exception {
-        Mockito.when(userService.updateUser(any(UpdateUserDTO.class), anyString()))
-                .thenThrow(new UserException("User not found"));
+    void getUserById_WhenUserNotFound_ShouldReturnNotFound() throws Exception {
+        // Given
+        String token = createTestUserAndGetToken("valid_user", "pass", List.of("ROLE_USER"));
 
-        mockMvc.perform(patch(USERS_ROOT_ENDPOINT)
-                        .header("Authorization", "Bearer " + validToken)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(testUpdateUserDTO)))
+        // When & Then
+        mockMvc.perform(get(USERS_ID_ENDPOINT, 999999L)
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").value("User not found"));
+                .andExpect(jsonPath("$.message").exists());
     }
 
     @Test
-    void assignOwnerRole_WhenUserNotFound_ShouldReturnNotFound() throws Exception {
-        Mockito.when(userService.assignOwnerRole(anyLong()))
-                .thenThrow(new UserException("User not found"));
+    void deleteUser_ByOwner_ShouldDeleteAndReturn200() throws Exception {
+        // Given
+        String token = createTestUserAndGetToken("user_to_delete", "pass", List.of("ROLE_USER"));
+        User user = userRepository.findByUsername("user_to_delete").orElseThrow();
 
-        mockMvc.perform(post(ASSIGN_OWNER_ENDPOINT, 999L)
-                        .contentType(MediaType.APPLICATION_JSON))
+        // When
+        mockMvc.perform(delete(USERS_ID_ENDPOINT, user.getId())
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk());
+
+        // Then
+        assertThat(userRepository.existsById(user.getId())).isFalse();
+    }
+
+    @Test
+    void deleteUser_ByAdmin_ShouldDeleteAndReturn200() throws Exception {
+        // Given
+        createTestUserAndGetToken("target_user", "pass", List.of("ROLE_USER"));
+        User targetUser = userRepository.findByUsername("target_user").orElseThrow();
+
+        String adminToken = createTestUserAndGetToken("test_admin", "pass", List.of("ROLE_ADMIN"));
+
+        // When
+        mockMvc.perform(delete(USERS_ID_ENDPOINT, targetUser.getId())
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isOk());
+
+        // Then
+        assertThat(userRepository.existsById(targetUser.getId())).isFalse();
+    }
+
+    @Test
+    void deleteUser_ByAnotherUser_ShouldReturnBadRequest() throws Exception {
+        // Given
+        createTestUserAndGetToken("victim_user", "pass", List.of("ROLE_USER"));
+        User victimUser = userRepository.findByUsername("victim_user").orElseThrow();
+
+        String hackerToken = createTestUserAndGetToken("hacker_user", "pass", List.of("ROLE_USER"));
+
+        // When & Then
+        mockMvc.perform(delete(USERS_ID_ENDPOINT, victimUser.getId())
+                        .header("Authorization", "Bearer " + hackerToken))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").value("User not found"));
+                .andExpect(jsonPath("$.message").value("You can only delete your own account."));
+
+        assertThat(userRepository.existsById(victimUser.getId())).isTrue();
     }
 }
