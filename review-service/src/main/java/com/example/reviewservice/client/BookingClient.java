@@ -7,6 +7,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 
 @FeignClient(
         name = "booking-service",
+        url = "${feign-client.url.booking-service:http://booking-service:8080}",
         configuration = FeignClientConfig.class,
         fallback = BookingClientFallback.class
 )

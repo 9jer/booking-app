@@ -13,11 +13,6 @@ spring:
   cache:
     type: redis
 
-eureka:
-  client:
-    serviceUrl:
-      defaultZone: http://eureka:password@discovery-server:8761/eureka
-
 management:
   otlp:
     tracing:
