@@ -1,0 +1,13 @@
+auth:
+  postgresPassword: "postgres"
+
+primary:
+  persistence:
+    size: 2Gi
+  initdb:
+    scripts:
+      init-dbs.sql: |
+        CREATE DATABASE user_service_db;
+        CREATE DATABASE property_service_db;
+        CREATE DATABASE booking_service_db;
+        CREATE DATABASE review_service_db;
