@@ -14,8 +14,8 @@ import org.springframework.test.web.servlet.MockMvc;
         properties = {
                 "eureka.client.enabled=false",
                 "spring.cloud.discovery.enabled=false",
-                "spring.cloud.openfeign.client.config.user-service.url=http://localhost:${wiremock.server.port}",
-                "spring.cloud.openfeign.client.config.booking-service.url=http://localhost:${wiremock.server.port}",
+                "feign-client.url.user-service=http://localhost:${wiremock.server.port}",
+                "feign-client.url.booking-service=http://localhost:${wiremock.server.port}",
                 "spring.kafka.properties.schema.registry.url=mock://test-registry",
                 "spring.kafka.producer.properties.schema.registry.url=mock://test-registry",
                 "spring.kafka.consumer.properties.schema.registry.url=mock://test-registry",
