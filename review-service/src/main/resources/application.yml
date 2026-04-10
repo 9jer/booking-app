@@ -42,6 +42,8 @@ spring:
     openfeign:
       circuitbreaker:
         enabled: true
+    discovery:
+      enabled: false
 
 resilience4j:
   circuitbreaker:
@@ -64,14 +66,6 @@ springdoc:
     path: /swagger-ui.html
   api-docs:
     path: /v3/api-docs
-
-eureka:
-  client:
-    serviceUrl:
-      defaultZone: http://localhost:8761/eureka
-  instance:
-    instance-id: review-service-instance-${random.uuid}
-    prefer-ip-address: true
 
 management:
   endpoints:
@@ -112,3 +106,7 @@ feign-client:
     was-booked: /api/v1/bookings/was-booked
     user-exists: /api/v1/users/{id}/exists
     get-user-by-id: /api/v1/users/{id}
+  url:
+    booking-service: http://booking-service:8080
+    property-service: http://property-service:8080
+    user-service: http://user-service:8080

@@ -8,6 +8,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 
 @FeignClient(
         name = "user-service",
+        url = "${feign-client.url.user-service:http://user-service:8080}",
         configuration = FeignClientConfig.class,
         fallback = UserClientFallback.class
 )

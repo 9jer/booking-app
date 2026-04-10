@@ -1,0 +1,79 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: user-service
+  labels:
+    app: user-service
+spec:
+  selector:
+    app: user-service
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8084
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: user-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: user-service
+  template:
+    metadata:
+      labels:
+        app: user-service
+    spec:
+      containers:
+        - name: user-service
+          image: 90jer/user-service:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8084
+          env:
+            - name: SPRING_PROFILES_ACTIVE
+              value: "docker"
+            - name: SPRING_DATASOURCE_URL
+              value: "jdbc:postgresql://postgres-postgresql:5432/user_service_db"
+            - name: SPRING_DATASOURCE_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: db-username
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: db-password
+            - name: SPRING_DATASOURCE_HIKARI_POOL_NAME
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: spring-datasource-hikari-pool-name
+            - name: SPRING_DATA_REDIS_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: redis-host
+            - name: SPRING_DATA_REDIS_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: redis-port
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: jwt-secret
+            - name: EUREKA_CLIENT_ENABLED
+              value: "false"
+            - name: MANAGEMENT_OTLP_TRACING_ENDPOINT
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: otlp-tracing-endpoint
+            - name: MANAGEMENT_METRICS_TAGS_APPLICATION
+              value: "user-service"
