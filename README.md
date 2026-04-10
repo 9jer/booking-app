@@ -132,21 +132,21 @@ This project is a platform for searching and booking short-term accommodations f
 3. **Set Up Database:**
    Ensure PostgreSQL is running. Configure credentials in `application.yml` (for local run) or rely on `docker-compose.yml` (for Docker run).
 
-### 4. Build and Run with Docker Compose (Local Environment)
+4. **Build and Run with Docker Compose (Local Environment):**
 
-This project uses the **Jib Maven Plugin** for containerization.
-
-**Step 1: Build local Docker images**
-First, build the microservices and load the images into your local Docker daemon by running the following command from the root directory:
-```bash
-mvn clean compile jib:build
-```
-
-**Step 2: Start the application**
-Once all images are successfully built, spin up the entire infrastructure in the background:
-```bash
-docker-compose up -d
-```
+   This project uses the **Jib Maven Plugin** for containerization.
+    
+   **Step 1: Build local Docker images**
+   First, build the microservices and load the images into your local Docker daemon by running the following command from the root directory:
+   ```bash
+   mvn clean compile jib:build
+   ```
+    
+   **Step 2: Start the application**
+   Once all images are successfully built, spin up the entire infrastructure in the background:
+   ```bash
+   docker-compose up -d
+   ```
 
 5. **Run in Kubernetes (Optional):**
    The project includes Kustomize configurations for deployment to Kubernetes. First, ensure you have a running cluster (e.g., Minikube).
