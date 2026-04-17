@@ -148,7 +148,7 @@ This project is a platform for searching and booking short-term accommodations f
    docker-compose up -d
    ```
 
-5. **Run in Kubernetes (Optional):**
+5. **Run in Kubernetes:**
    The project includes Kustomize configurations for deployment to Kubernetes. First, ensure you have a running cluster (e.g., Minikube).
    ```bash
    kubectl apply -k k8s/infra
